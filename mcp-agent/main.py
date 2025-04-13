@@ -1,8 +1,12 @@
 ###################################################################
+# Dette er en demo av hvordan vi kan bruke MCP agent i langchain
+
+# Dette er source code for use MCP agenten som jeg brukte som base
+# https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/mcpagent.py
+
 # MCP Agent for LangChain
-
+# Dette er source code for å gjøre MCP til langchain tools
 # https://github.com/hideya/langchain-mcp-tools-py?tab=readme-ov-file
-
 
 # further on this is one way we can create more complex systems
 # https://github.com/roboticsocialism/langgraph_demo/blob/main/langgraph_demo.py
