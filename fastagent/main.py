@@ -30,7 +30,7 @@ class ChatRequest(BaseModel):
 llm = ChatOpenAI(
     temperature=0,
     model="gpt-4",  # Changed from "gpt-4o-mini" as this isn't a valid model name
-    openai_api_key=os.getenv("OPENAI_API_KEY"),
+    api_key=os.getenv("OPENAI_API_KEY"),
     streaming=True
 )
 
