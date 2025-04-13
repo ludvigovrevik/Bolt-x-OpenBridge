@@ -72,7 +72,7 @@ async def chat_endpoint(request: ChatRequest):
 
                     # Send valid JSON-serializable data
                     data = f"data: {json.dumps({'text': chunk_content, 'inArtifact': in_artifact})}\n\n"
-                    print(data)
+                    #print(data)
                     yield data
 
             yield "data: [DONE]\n\n"
