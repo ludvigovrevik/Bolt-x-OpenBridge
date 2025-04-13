@@ -1,4 +1,18 @@
-# main.py (updated)
+###################################################################
+# MCP Agent for LangChain
+
+# https://github.com/hideya/langchain-mcp-tools-py?tab=readme-ov-file
+
+
+# further on this is one way we can create more complex systems
+# https://github.com/roboticsocialism/langgraph_demo/blob/main/langgraph_demo.py
+
+# This is how we can create human in the loop using the standard scrathpad agent
+# https://langchain-ai.github.io/langgraph/how-tos/create-react-agent-hitl/#code
+
+####################################################################
+
+# main.py
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
