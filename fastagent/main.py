@@ -42,28 +42,8 @@ SYSTEM_PROMPT = get_prompt(WEB_CONTAINER_WORK_DIR)
 
 CONTINUE_PROMPT = "Continue your prior response. IMPORTANT: Immediately begin from where you left off without any interruptions. Do not repeat any content, including artifact and action tags."
 
-MOCK_RESPONSE = """
-<boltArtifact id="my-script" title="Running a Node.js script">
-  <boltAction type="file" filePath="index.js">
-    console.log("Hello from Node.js!");
-  </boltAction>
-  <boltAction type="shell">
-    node index.js
-  </boltAction>
-</boltArtifact>
-"""
-
 @app.post("/api/chat")
 async def chat_endpoint(request: ChatRequest):
-    if MOCK_RESPONSE:
-        async def mock_generate():
-            for char in MOCK_RESPONSE:
-                await asyncio.sleep(0.01)  # Simulate streaming
-                print(char)
-                yield f"data: {json.dumps({'text': char, 'inArtifact': '<boltArtifact' in MOCK_RESPONSE and '</boltArtifact>' not in char})}\n\n"
-            yield "data: [DONE]\n\n"
-        return StreamingResponse(mock_generate(), media_type="text/event-stream")
-
     try:
         messages = [
             SystemMessage(content=SYSTEM_PROMPT)
@@ -91,7 +71,7 @@ async def chat_endpoint(request: ChatRequest):
                         in_artifact = False
 
                     # Send valid JSON-serializable data
-                    data = f"data: {json.dumps({'text': content_buffer, 'inArtifact': in_artifact})}\n\n"
+                    data = f"data: {json.dumps({'text': chunk_content, 'inArtifact': in_artifact})}\n\n"
                     print(data)
                     yield data
 
