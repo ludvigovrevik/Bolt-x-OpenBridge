@@ -47,15 +47,17 @@ class MCPAgent:
     def __init__(self):
         self.llm = None
         repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        frontend = os.path.join(repo_root, "app")
+        self.folder = frontend
         self.mcp_servers = {
             "filesystem": {
                 "command": "npx",
                 "args": [
                     "-y",  # Crucial for non-interactive execution
                     "@modelcontextprotocol/server-filesystem",
-                    os.path.expanduser(repo_root)  # Home directory as root
+                    os.path.expanduser(self.folder)  # Home directory as root
                 ],
-                "cwd": os.path.expanduser(repo_root)  # Explicit working directory
+                "cwd": os.path.expanduser(self.folder)  # Explicit working directory
             }
         }
         self.tools = None
@@ -216,6 +218,8 @@ async def chat_endpoint(request: ChatRequest):
 
             final_state = app.state.agent.graph.get_state(config).values
             print(f"Final state: {final_state}")
+
+        print("Finished graph execution!")
         return StreamingResponse(event_stream(), media_type="text/event-stream")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

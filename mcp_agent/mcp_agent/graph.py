@@ -15,8 +15,6 @@ class AgentState(TypedDict):
     intermediate_steps: Annotated[list[tuple[AgentAction, str]], operator.add]
 
 def create_agent_graph(llm, tools, prompt, checkpointer=None):
-    tools_by_name = {tool.name: tool for tool in tools}
-
     # Define nodes
     async def call_model(state: AgentState, config: RunnableConfig):
         print(state)
