@@ -10,8 +10,6 @@ logging.basicConfig(level=logging.INFO)
 
 load_dotenv()
 
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 
 def load_model(model_name, tools=None, prompt=None, parser=False):
     """Load the model dynamically based on the parameter."""
@@ -22,13 +20,17 @@ def load_model(model_name, tools=None, prompt=None, parser=False):
             temperature=0,
             max_tokens=1000,  # Limit output tokens
             timeout=60,
-            max_retries=2)
+            max_retries=2,
+            api_key=os.getenv('GOOGLE_API_KEY')
+            )
     else:
         model = ChatOpenAI(
             model=model_name,
             temperature=0,
             max_tokens=None,  # Limit output tokens
-            streaming=True)
+            streaming=True,
+            api_key=os.getenv('OPENAI_API_KEY')
+            )
 
     # Bind tools if provided
     if tools:
@@ -40,8 +42,7 @@ def load_model(model_name, tools=None, prompt=None, parser=False):
 
     # Create a chain based on the parser parameter
     if parser:
-        chain = prompt | model | parser
-        return chain
+        model = model.with_structured_ouput(schema=parser)
 
     # Default chain without parser
     return model

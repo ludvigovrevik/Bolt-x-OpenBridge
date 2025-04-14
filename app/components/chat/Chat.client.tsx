@@ -24,7 +24,6 @@ export function Chat() {
   renderLogger.trace('Chat');
 
   const { ready, initialMessages, storeMessageHistory } = useChatHistory();
-  console.log("Chat component - ready state:", ready); // Add this line
 
   return (
     <>

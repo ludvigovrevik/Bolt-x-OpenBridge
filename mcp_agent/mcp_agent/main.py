@@ -25,9 +25,9 @@ from typing import List, Dict
 import os
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.messages import (
+    HumanMessage, AIMessage, SystemMessage, BaseMessage)
 import asyncio
-from langchain_openai import ChatOpenAI as LC_ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 from langchain_mcp_tools import convert_mcp_to_langchain_tools
 from langgraph.checkpoint.memory import MemorySaver
@@ -36,15 +36,16 @@ from contextlib import asynccontextmanager
 from json import JSONEncoder
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from .prompt import get_prompt
-
+from .load_model import load_model
+from .graph import create_agent_graph, AgentState
 #from .prompt import get_prompt
 
 load_dotenv()
 
 # Update the MCPAgent class with these key changes
 class MCPAgent:
-    def __init__(self, llm):
-        self.llm = llm
+    def __init__(self):
+        self.llm = None
         self.mcp_servers = {
             "filesystem": {
                 "command": "npx",
@@ -52,34 +53,32 @@ class MCPAgent:
             }
         }
         self.tools = None
-        self.agent_executor = None
         self.cleanup_func = None
         self.config = {"configurable": {"thread_id": "42"}}
         self.output_parser = None   # Placeholder for output parser
         self.human_in_the_loop = False
         self.prompt = self.create_prompt(os.getcwd())
-
+        self.graph = None
         self.checkpointer = MemorySaver()
 
-    def create_prompt(self, cwd: str) -> SystemMessage:
-        system_message = get_prompt(cwd)
-        return SystemMessage(
-            content=system_message
-        )
+    def create_prompt(self, cwd: str) -> ChatPromptTemplate:
+        return [SystemMessage(content=get_prompt(cwd))]
 
     async def initialize(self):
         self.tools, self.cleanup_func = await convert_mcp_to_langchain_tools(self.mcp_servers)
+        self.llm = load_model(model_name="gpt-4o-mini", tools=self.tools)
+        
+        # Remove the nested initialize function and create the graph directly
         if self.tools:
-            self.agent_executor = create_react_agent(
+            self.graph = create_agent_graph(
                 self.llm,
-                tools=self.tools,
-                prompt=self.prompt,
-                checkpointer=self.checkpointer,
-                #interrupt_before=["tools"],
+                self.tools,
+                self.prompt,
+                self.checkpointer
             )
         else:
             raise Exception("No tools were loaded from MCP servers")
-
+        
     # Add output formatting middleware
     async def format_response(self, content: str) -> str:
         """Ensure proper XML tag formatting in model responses"""
@@ -87,16 +86,18 @@ class MCPAgent:
         content = content.replace("</boltArtifact>", "</boltArtifact>\n")
         return content
 
-    async def astream_events(self, query: str, config: dict):
-        inputs = {
-            "messages": 
-            [HumanMessage(content=query),
-            self.prompt
-            ]
-        }
-
-        async for event in self.agent_executor.astream_events(
-            inputs,
+    async def astream_events(self, input: List[BaseMessage], config: dict):
+        # Convert input messages to AgentState format
+        initial_state = AgentState(
+            messages=input,
+            agent_outcome=None,
+            return_direct=False,
+            intermediate_steps=[]
+        )
+        
+        # Use proper input format for the graph
+        async for event in self.graph.astream_events(
+            initial_state,
             config=config,
             stream_mode="values"
         ):
@@ -121,15 +122,9 @@ class ChatRequest(BaseModel):
 
 @app.on_event("startup")
 async def startup_event():
-    llm = LC_ChatOpenAI(
-        temperature=0,
-        model="gpt-4o",
-        openai_api_key=os.getenv("OPENAI_API_KEY")
-    )
-    app.state.agent = MCPAgent(llm)
+    app.state.agent = MCPAgent()
     await app.state.agent.initialize() # Initialize the agent
     app.state.agent.create_prompt(os.getcwd())  # Initialize the prompt
-
 
 
 @app.on_event("shutdown")
@@ -137,17 +132,19 @@ async def shutdown_event():
     if hasattr(app.state.agent, 'cleanup'):
         await app.state.agent.cleanup()
 
-# ... (keep previous imports and setup)
 
-# Update the chat endpoint
 @app.post("/api/chat")
 async def chat_endpoint(request: ChatRequest):
+    # Convert request messages to BaseMessage instances
     try:
-        user_messages = [msg for msg in request.messages if msg["role"] == "user"]
-        if not user_messages:
-            raise HTTPException(status_code=400, detail="No user message found")
-        latest_user_message = user_messages[-1]["content"]
-        print(f"Latest user message: {latest_user_message}")
+        user_messages = []
+        for msg in request.messages:
+            role = msg['role']
+            content = msg['content']
+            if role == 'user':
+                user_messages.append(HumanMessage(content=content))  # Fixed variable name
+        
+        print(f"Processed messages: {user_messages}")
 
         async def event_stream():
             config = {"configurable": {"thread_id": request.thread_id}}
@@ -155,7 +152,7 @@ async def chat_endpoint(request: ChatRequest):
             buffer = ""  # Buffer for incomplete tags
 
             async for event in app.state.agent.astream_events(
-                query=latest_user_message,
+                input=user_messages,
                 config=config
             ):
                 if event["event"] == "on_chat_model_stream":
@@ -173,16 +170,16 @@ async def chat_endpoint(request: ChatRequest):
                             if close_pos != -1:
                                 # Found closing tag - emit content up to close tag
                                 artifact_content = to_process[:close_pos]
-                                yield artifact_content  # Yield plain text
+                                yield artifact_content
 
                                 # Emit closing tag
-                                yield '</boltArtifact>'  # Yield plain text
+                                yield '</boltArtifact>'
 
                                 artifact_stack.pop()
                                 to_process = to_process[close_pos + len("</boltArtifact>"):]
                             else:
                                 # No closing tag yet - buffer all content
-                                yield to_process  # Yield plain text
+                                buffer = to_process
                                 break
                         else:
                             # Outside artifact - look for opening tag
@@ -191,14 +188,14 @@ async def chat_endpoint(request: ChatRequest):
                                 # Found opening tag - emit content before tag
                                 if open_pos > 0:
                                     plain_text = to_process[:open_pos]
-                                    yield plain_text  # Yield plain text
+                                    yield plain_text
 
                                 # Find end of opening tag
                                 tag_end_pos = to_process.find(">", open_pos)
                                 if tag_end_pos != -1:
                                     # Complete tag found - emit it
                                     tag_content = to_process[open_pos:tag_end_pos + 1]
-                                    yield tag_content  # Yield plain text
+                                    yield tag_content
 
                                     artifact_stack.append(True)  # Mark we're in an artifact
                                     to_process = to_process[tag_end_pos + 1:]
@@ -208,10 +205,11 @@ async def chat_endpoint(request: ChatRequest):
                                     break
                             else:
                                 # No tags - emit all as plain text
-                                yield to_process  # Yield plain text
+                                yield to_process
                                 break
 
+            final_state = app.state.agent.graph.get_state(config).values
+            print(f"Final state: {final_state}")
         return StreamingResponse(event_stream(), media_type="text/event-stream")
-
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
