@@ -44,6 +44,8 @@
     "@lezer/highlight": "^1.2.0",
     "@modelcontextprotocol/server-filesystem": "^2025.3.28",
     "@nanostores/react": "^0.7.2",
+    "@oicl/openbridge-webcomponents": "^0.0.17",
+    "@oicl/openbridge-webcomponents-react": "^0.0.17",
     "@radix-ui/react-dialog": "^1.1.1",
     "@radix-ui/react-dropdown-menu": "^2.1.1",
     "@remix-run/cloudflare": "^2.10.2",
