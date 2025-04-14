@@ -24,9 +24,9 @@ export function Header() {
         <div className="i-ph:sidebar-simple-duotone text-xl" />
         <a href="/" className="text-2xl font-semibold text-accent flex items-center">
           {theme === 'dark' ? (
-            <img src="/logowhite.png" alt="SoftBridge Logo" className="w-[46px] inline-block" />
+            <img src="/logowhite.png" alt="SoftBridge Logo" className="w-[60px] inline-block" />
           ) : (
-            <img src="/logodark.png" alt="SoftBridge Logo" className="w-[46px] inline-block" />
+            <img src="/logodark.png" alt="SoftBridge Logo" className="w-[60px] inline-block" />
           )}
         </a>
       </div>
