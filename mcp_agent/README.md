@@ -59,17 +59,17 @@ Production Mode
 uvicorn mcp_agent.main:app --host 0.0.0.0 --port 8000
 ```
 
-References
-### Dette er source code for use MCP agenten som jeg brukte som base
+## References
+MCP Use agent using langchain
 https://github.com/mcp-use/mcp-use/blob/main/mcp_use/agents/mcpagent.py
 
-### Dette er source code for å gjøre MCP til langchain tools
+Transformation of MCP tools to langchain tools
 https://github.com/hideya/langchain-mcp-tools-py?tab=readme-ov-file
 
-### further on this is one way we can create more complex systems
+Further on this is one way we can create more complex systems
 https://github.com/roboticsocialism/langgraph_demo/blob/main/langgraph_demo.py
 
-### This is how we can create human in the loop using the standard scrathpad agent
+This is how we can create human in the loop using the standard scrathpad agent
 https://langchain-ai.github.io/langgraph/how-tos/create-react-agent-hitl/#code
 
 
