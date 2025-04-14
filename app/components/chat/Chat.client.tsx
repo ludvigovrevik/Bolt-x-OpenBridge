@@ -100,58 +100,9 @@ export const ChatImpl = memo(({ initialMessages, storeMessageHistory }: ChatProp
     chatStore.setKey('started', initialMessages.length > 0);
   }, []);
 
-    useEffect(() => {
-      // Modify the messages before passing to parseMessages
-      const textOnlyMessages = messages.map(message => {
-        if (message.role === 'assistant' && message.content) {
-          console.log("Raw message.content:", message.content);
-    
-          // Split the concatenated string by the closing brace of one JSON and opening of the next
-          const jsonStrings = message.content.split('}{');
-          let extractedText = '';
-    
-          jsonStrings.forEach((jsonString, index) => {
-            // Ensure each part is a valid JSON object
-            const prefix = index > 0 ? '{' : '';
-            const suffix = index < jsonStrings.length - 1 ? '}' : '';
-            const validJsonString = prefix + jsonString + suffix;
-    
-            try {
-              const parsedContent = JSON.parse(validJsonString);
-              console.log("parsed content: ", parsedContent);
-              if (parsedContent && typeof parsedContent === 'object' && parsedContent.text !== undefined) {
-                extractedText += parsedContent.text;
-              }
-            } catch (error) {
-              console.error("Error parsing JSON chunk:", error, validJsonString);
-              // Handle cases where a chunk might not be valid JSON
-              if (index === 0 && message.content.startsWith('{') && !message.content.includes('}{')) {
-                // Try parsing the entire content if it seems like a single malformed JSON
-                try {
-                  const singleParseAttempt = JSON.parse(message.content);
-                  if (singleParseAttempt?.text) {
-                    extractedText += singleParseAttempt.text;
-                  }
-                } catch (singleParseError) {
-                  console.error("Error parsing single malformed JSON:", singleParseError, message.content);
-                }
-              }
-            }
-          });
-    
-          return { ...message, content: extractedText };
-        }
-        return message;
-      });
-    
-    {/* 
-      Content above is new because we are using text stream protocol. 
-      Therefor we need to extract the text from the json
-      Below the orignal content of the useeffect 
-      But we parse textOnlyMessages instead of messages 
-    */} 
-    parseMessages(textOnlyMessages, isLoading);
-
+  useEffect(() => {
+    parseMessages(messages, isLoading);
+  
     if (messages.length > initialMessages.length) {
       storeMessageHistory(messages).catch((error) => toast.error(error.message));
     }

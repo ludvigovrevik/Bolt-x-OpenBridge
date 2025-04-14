@@ -148,7 +148,7 @@ async def chat_endpoint(request: ChatRequest):
             raise HTTPException(status_code=400, detail="No user message found")
         latest_user_message = user_messages[-1]["content"]
         print(f"Latest user message: {latest_user_message}")
-        
+
         async def event_stream():
             config = {"configurable": {"thread_id": request.thread_id}}
             artifact_stack = []  # Track nested artifacts
@@ -161,11 +161,11 @@ async def chat_endpoint(request: ChatRequest):
                 if event["event"] == "on_chat_model_stream":
                     chunk = event["data"]["chunk"]
                     content = chunk.content
-                    
+
                     # Process the content with any buffered data from previous chunks
                     to_process = buffer + content
                     buffer = ""
-                    
+
                     while to_process:
                         if artifact_stack:
                             # Inside an artifact - look for closing tag
@@ -173,16 +173,16 @@ async def chat_endpoint(request: ChatRequest):
                             if close_pos != -1:
                                 # Found closing tag - emit content up to close tag
                                 artifact_content = to_process[:close_pos]
-                                yield json.dumps({'text': artifact_content})
-                                
+                                yield artifact_content  # Yield plain text
+
                                 # Emit closing tag
-                                yield json.dumps({'text': '</boltArtifact>'})
-                                
+                                yield '</boltArtifact>'  # Yield plain text
+
                                 artifact_stack.pop()
                                 to_process = to_process[close_pos + len("</boltArtifact>"):]
                             else:
                                 # No closing tag yet - buffer all content
-                                yield json.dumps({'text': to_process})
+                                yield to_process  # Yield plain text
                                 break
                         else:
                             # Outside artifact - look for opening tag
@@ -191,15 +191,15 @@ async def chat_endpoint(request: ChatRequest):
                                 # Found opening tag - emit content before tag
                                 if open_pos > 0:
                                     plain_text = to_process[:open_pos]
-                                    yield json.dumps({'text': plain_text})
-                                
+                                    yield plain_text  # Yield plain text
+
                                 # Find end of opening tag
                                 tag_end_pos = to_process.find(">", open_pos)
                                 if tag_end_pos != -1:
                                     # Complete tag found - emit it
                                     tag_content = to_process[open_pos:tag_end_pos + 1]
-                                    yield json.dumps({'text': tag_content})
-                                    
+                                    yield tag_content  # Yield plain text
+
                                     artifact_stack.append(True)  # Mark we're in an artifact
                                     to_process = to_process[tag_end_pos + 1:]
                                 else:
@@ -208,7 +208,7 @@ async def chat_endpoint(request: ChatRequest):
                                     break
                             else:
                                 # No tags - emit all as plain text
-                                yield json.dumps({'text': to_process})
+                                yield to_process  # Yield plain text
                                 break
 
         return StreamingResponse(event_stream(), media_type="text/event-stream")
