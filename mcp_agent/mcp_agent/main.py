@@ -75,7 +75,7 @@ class MCPAgent:
                 tools=self.tools,
                 prompt=self.prompt,
                 checkpointer=self.checkpointer,
-                interrupt_before=["tools"],
+                #interrupt_before=["tools"],
             )
         else:
             raise Exception("No tools were loaded from MCP servers")
@@ -148,75 +148,68 @@ async def chat_endpoint(request: ChatRequest):
             raise HTTPException(status_code=400, detail="No user message found")
         latest_user_message = user_messages[-1]["content"]
         print(f"Latest user message: {latest_user_message}")
+        
         async def event_stream():
             config = {"configurable": {"thread_id": request.thread_id}}
             artifact_stack = []  # Track nested artifacts
-            current_artifact = {
-                "id": None,
-                "title": None,
-                "content": []
-            }
+            buffer = ""  # Buffer for incomplete tags
 
-            event_stream = app.state.agent.astream_events(
+            async for event in app.state.agent.astream_events(
                 query=latest_user_message,
                 config=config
-            )
-
-            async for event in event_stream:
+            ):
                 if event["event"] == "on_chat_model_stream":
                     chunk = event["data"]["chunk"]
                     content = chunk.content
-
-                    # Handle artifact tags and structure
-                    if "<boltArtifact" in content:
-                        # Extract artifact metadata
-                        tag_start = content.find("<boltArtifact")
-                        tag_end = content.find(">", tag_start)
-                        if tag_end == -1:
-                            continue  # Incomplete tag, wait for next chunk
-
-                        tag_content = content[tag_start:tag_end+1]
-                        artifact_id = re.search(r'id="([^"]*)"', tag_content).group(1)
-                        artifact_title = re.search(r'title="([^"]*)"', tag_content).group(1)
-
-                        # Start new artifact
-                        artifact_stack.append({
-                            "id": artifact_id,
-                            "title": artifact_title,
-                            "content": [content[tag_end+1:]]
-                        })
-                        yield f"data: {json.dumps({'text': tag_content, 'inArtifact': True})}\n\n"
-
-                    elif "</boltArtifact>" in content and artifact_stack:
-                        # End current artifact
-                        end_tag_pos = content.find("</boltArtifact>")
-                        current_artifact = artifact_stack.pop()
-                        current_artifact["content"].append(content[:end_tag_pos])
-
-                        # Send artifact content
-                        full_content = "".join(current_artifact["content"])
-                        yield json.dumps({
-                            'text': full_content,
-                            'inArtifact': True,
-                            'artifact': {
-                                'id': current_artifact["id"],
-                                'title': current_artifact["title"]
-                            }
-                        })
-
-                        # Send closing tag
-                        yield json.dumps({'text': '</boltArtifact>', 'inArtifact': True})
-
-
-                    elif artifact_stack:
-                        # Add content to current artifact
-                        artifact_stack[-1]["content"].append(content)
-
-                    else:
-                        # Regular text content
-                        yield json.dumps({'text': content, 'inArtifact': False})
-
-            yield "data: DONE\n\n"
+                    
+                    # Process the content with any buffered data from previous chunks
+                    to_process = buffer + content
+                    buffer = ""
+                    
+                    while to_process:
+                        if artifact_stack:
+                            # Inside an artifact - look for closing tag
+                            close_pos = to_process.find("</boltArtifact>")
+                            if close_pos != -1:
+                                # Found closing tag - emit content up to close tag
+                                artifact_content = to_process[:close_pos]
+                                yield json.dumps({'text': artifact_content})
+                                
+                                # Emit closing tag
+                                yield json.dumps({'text': '</boltArtifact>'})
+                                
+                                artifact_stack.pop()
+                                to_process = to_process[close_pos + len("</boltArtifact>"):]
+                            else:
+                                # No closing tag yet - buffer all content
+                                yield json.dumps({'text': to_process})
+                                break
+                        else:
+                            # Outside artifact - look for opening tag
+                            open_pos = to_process.find("<boltArtifact")
+                            if open_pos != -1:
+                                # Found opening tag - emit content before tag
+                                if open_pos > 0:
+                                    plain_text = to_process[:open_pos]
+                                    yield json.dumps({'text': plain_text})
+                                
+                                # Find end of opening tag
+                                tag_end_pos = to_process.find(">", open_pos)
+                                if tag_end_pos != -1:
+                                    # Complete tag found - emit it
+                                    tag_content = to_process[open_pos:tag_end_pos + 1]
+                                    yield json.dumps({'text': tag_content})
+                                    
+                                    artifact_stack.append(True)  # Mark we're in an artifact
+                                    to_process = to_process[tag_end_pos + 1:]
+                                else:
+                                    # Incomplete tag - buffer for next chunk
+                                    buffer = to_process[open_pos:]
+                                    break
+                            else:
+                                # No tags - emit all as plain text
+                                yield json.dumps({'text': to_process})
+                                break
 
         return StreamingResponse(event_stream(), media_type="text/event-stream")
 
