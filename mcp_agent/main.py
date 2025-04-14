@@ -46,10 +46,16 @@ load_dotenv()
 class MCPAgent:
     def __init__(self):
         self.llm = None
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.mcp_servers = {
             "filesystem": {
                 "command": "npx",
-                "args": ["@modelcontextprotocol/server-filesystem", os.getcwd()]
+                "args": [
+                    "-y",  # Crucial for non-interactive execution
+                    "@modelcontextprotocol/server-filesystem",
+                    os.path.expanduser(repo_root)  # Home directory as root
+                ],
+                "cwd": os.path.expanduser(repo_root)  # Explicit working directory
             }
         }
         self.tools = None
