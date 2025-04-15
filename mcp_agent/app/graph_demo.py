@@ -1,5 +1,5 @@
 # graph.py
-from typing import TypedDict, Annotated, Union, Sequence, Optional, Dict, List
+from typing import TypedDict, Annotated, Union, Sequence, Optional, Dict, List, Any
 from langchain_core.agents import AgentAction, AgentFinish
 from langchain_core.messages import BaseMessage, ToolMessage, AIMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
@@ -14,10 +14,20 @@ from .load_model import load_model
 from .prompts.artifact_prompt import get_prompt
 
 
+class FileSpecification(BaseModel):
+    path: str
+    purpose: str
+    dependencies: List[str] = Field(default_factory=list)
+
+# Define the structure we want for each file
+class ListFileSpecification(BaseModel):
+    file: List[FileSpecification] = Field(..., description="List of file specifications")
+
 class AgentState(BaseModel):
     """State of the agent."""
     cwd: str = Field(default=".", description="Current working directory")
     messages: Annotated[Sequence[BaseMessage], operator.add]
+    human_input: Optional[list[BaseMessage]] = None
     agent_outcome: Union[AgentAction, AgentFinish, None] = None
     return_direct: bool = False
     intermediate_steps: Annotated[list[tuple[AgentAction, str]], operator.add]  = Field(default_factory=list)
@@ -29,6 +39,10 @@ class EnhancedAgentState(AgentState):
     design_spec: Optional[DesignSpecification] = None
     current_files: Dict[str, str] = Field(default_factory=dict)
     implementation_plan: List[str] = Field(default_factory=list)
+    files_to_generate: ListFileSpecification = Field(default_factory=list)  # Will contain FileSpecification objects
+    pending_files: List[str] = Field(default_factory=list)
+    completed_files: List[str] = Field(default_factory=list)
+    current_file_focus: Optional[str] = None
 
 
 def create_agent_graph(tools=None, checkpointer=None):
@@ -36,6 +50,7 @@ def create_agent_graph(tools=None, checkpointer=None):
     
     async def design_spec_generator(state: EnhancedAgentState, config: RunnableConfig):
         # Generate structured design spec
+        human_input = state.messages[-1]
         system_prompt = get_designer_prompt(
             cwd=state.cwd,
             file_list=list(state.current_files.keys()),
@@ -49,7 +64,10 @@ def create_agent_graph(tools=None, checkpointer=None):
         struct_llm = load_model(model_name=state.model_name, parser=DesignSpecification)
         design_spec_cls = await struct_llm.ainvoke(input)
         
-        return {"design_spec": design_spec_cls}
+        return {
+            "design_spec": design_spec_cls,
+            "human_input": [human_input],
+            }
     
     async def implementation_planner(state: EnhancedAgentState, config: RunnableConfig):
         """Generate list of files needed based on design spec"""
@@ -61,6 +79,12 @@ def create_agent_graph(tools=None, checkpointer=None):
         1. File path/name
         2. Purpose of the file
         3. Dependencies and relationships with other files
+        
+        Format your response as a list of objects, where each object has:
+        - path: the file path/name
+        - purpose: description of the file's purpose
+        - dependencies: list of other files it depends on
+        
         Be comprehensive and ensure all necessary files for the complete implementation are included.
         """
         
@@ -69,15 +93,15 @@ def create_agent_graph(tools=None, checkpointer=None):
             SystemMessage(content=f"Design Specification: {state.design_spec.schema_json()}"),
         ] + state.messages
         
-        # Generate file implementation plan
-        struct_llm = load_model(model_name=state.model_name, parser=list)
-        files_to_generate = await struct_llm.ainvoke(input)
+        # Generate file implementation plan with proper parsing
+        struct_llm = load_model(model_name=state.model_name, parser=ListFileSpecification)
+        files_specification = await struct_llm.ainvoke(input)
         
         # Update state with files that need to be created
         return {
-            "files_to_generate": files_to_generate,
-            "pending_files": [file["path"] for file in files_to_generate],
-            "messages": [AIMessage(content=f"Created implementation plan with {len(files_to_generate)} files to generate.")]
+            "files_to_generate": files_specification.file,  # Store the list of files
+            "pending_files": [file.path for file in files_specification.file],  # Access the path attribute from each file spec
+            "messages": [AIMessage(content=f"Created implementation plan with {len(files_specification.file)} files to generate.")]
         }
     
     async def file_selector(state: EnhancedAgentState, config: RunnableConfig):
@@ -88,32 +112,38 @@ def create_agent_graph(tools=None, checkpointer=None):
         next_file = state.pending_files[0]
         pending_files = state.pending_files[1:]  # Remove the selected file
         
-        file_details = next((file for file in state.files_to_generate if file["path"] == next_file), None)
+        file_details = next((file for file in state.files_to_generate if file.path == next_file), None)
         
         return {
             "current_file_focus": next_file,
             "pending_files": pending_files,
-            "messages": [AIMessage(content=f"Working on file: {next_file}\nPurpose: {file_details.get('purpose', 'N/A')}")],
+            "messages": [AIMessage(content=f"Working on file: {next_file}\nPurpose: {file_details.purpose if file_details else 'N/A'}")],
         }
     
+
+    class  FileGeneratorState
+
     async def file_generator(state: EnhancedAgentState, config: RunnableConfig):
         """Generate content for the current focus file"""
         if not state.current_file_focus:
             return {"messages": [AIMessage(content="No file selected for generation.")]}
         
         file_path = state.current_file_focus
-        file_details = next((file for file in state.files_to_generate if file["path"] == file_path), {})
+        file_details = next((file for file in state.files_to_generate if file.path == file_path), None)
+        
+        # Convert Pydantic model to dict if it exists, otherwise use empty dict
+        file_details_dict = file_details.dict() if file_details else {}
         
         system_prompt = get_prompt(
             cwd=state.cwd,
             tools=[],
-            file_details=file_details,
+            file_details=file_details_dict,
             design_specification=state.design_spec.model_dump() if state.design_spec else None,
             )
         
         input = [
             SystemMessage(content=system_prompt),
-        ] + state.messages
+        ] + state.human_input
         
         # Generate file content
         implementation_llm = load_model(model_name=state.model_name)
@@ -124,13 +154,13 @@ def create_agent_graph(tools=None, checkpointer=None):
         current_files[file_path] = file_content
         
         # Add to completed files
-        completed_files = state.completed_files.copy()
+        completed_files = state.completed_files.copy() if hasattr(state, 'completed_files') else []
         completed_files.append(file_path)
         
         return {
             "current_files": current_files,
             "completed_files": completed_files,
-            "messages": [AIMessage(content=f"Generated file: {file_path}\n\n```\n{file_content}\n```")]
+            "messages": [file_content],
         }
     
     def should_continue_implementation(state: EnhancedAgentState):
