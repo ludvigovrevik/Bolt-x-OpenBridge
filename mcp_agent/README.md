@@ -5,7 +5,7 @@ A FastAPI application that integrates MCP (Model Context Protocol) with LangChai
 ## Features
 
 - MCP Agent implementation with LangChain tools
-- OpenAI GPT-4o integration
+- OpenAI GPT-4.1 integration
 - Streaming response API
 - Human-in-the-loop capabilities
 - Artifact handling with BoltArtifact XML tags

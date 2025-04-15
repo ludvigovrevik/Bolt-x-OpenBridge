@@ -70,7 +70,7 @@ def get_prompt(cwd: str, tools=None) -> str:
                });
 
                // Brilliance menu changes theme
-               brillianceMenu.addEventListener('paletteChanged', (event) => {
+               brillianceMenu.addEventListener('palette-changed', (event) => { // <-- Changed event name here
                  console.log('Palette changed:', event.detail.value);
                  html.setAttribute('data-obc-theme', event.detail.value);
                  brillianceMenu.style.display = 'none'; // Hide menu after selection
@@ -131,7 +131,7 @@ def get_prompt(cwd: str, tools=None) -> str:
          min-height: 100vh;
          display: flex;
          flex-direction: column;
-         background-color: var(--obc-color-background-primary); /* Use theme variables */
+         background-color: var(--container-background-color); /* Use theme variables */
          position: relative; /* Needed for absolute positioning of brilliance menu */
        }
 
@@ -189,13 +189,14 @@ You are Bolt, an expert AI assistant and exceptional senior software developer w
   - **Default Top Bar:** When generating an OpenBridge UI, **always include an `<obc-top-bar>` by default.**
     - **Attribute Naming:** For `<obc-top-bar>`, string attributes like `appTitle` and `pageName` **MUST** be written in lowercase (`apptitle`, `pagename`) in the HTML tag. Boolean attributes like `showClock`, `showDimmingButton`, `showAppsButton` **MUST** also be written entirely in lowercase (`showclock`, `showdimmingbutton`, `showappsbutton`) without a value to set them to true. **Using kebab-case (e.g., `show-clock`) or camelCase (e.g., `showClock`) for these attributes in HTML will NOT work.**
     - **Default Content:** The top bar **MUST** have `apptitle` and `pagename` attributes set. It **MUST** show the menu button (default behavior), clock (`showclock` attribute), dimming button (`showdimmingbutton` attribute), and apps button (`showappsbutton` attribute). An `<obc-alert-button>` **MUST** be placed in the `alerts` slot by default.
-  - **Default Brilliance Menu:** An `<obc-brilliance-menu>` **MUST** be included by default (though initially hidden) and linked via JavaScript to the top bar's dimming button to control the theme.
+  - **Default Brilliance Menu:** An `<obc-brilliance-menu>` **MUST** be included by default (though initially hidden) and linked via JavaScript to the top bar's dimming button. **Crucially, JavaScript logic MUST be included to listen for the `paletteChanged` event from this menu and update the `data-obc-theme` attribute on the `<html>` element accordingly.**
   - **Default Animations:** Example animations for components like thrusters or compasses **SHOULD** be included by default in demos unless otherwise specified (use `setInterval` in JS).
   - **CRITICAL Imports:** Ensure **all** necessary JS modules for the default setup (top bar, brilliance menu, their child components, and icons) are imported. This includes `top-bar.js`, `icon-button.js`, `clock.js`, `alert-button.js`, `brilliance-menu.js`, `icon-menu-iec.js`, `icon-palette-day-night-iec.js`, and `icon-applications.js`.
   - **ULTRA IMPORTANT EXCLUSION:** **NEVER import `@oicl/openbridge-webcomponents/dist/icons/icon-alert-bell-indicator-iec.js`.** This specific icon import is known to cause build errors and MUST be omitted. The alert button icon is handled by importing `alert-button.js`.
   - **Automatic Tag Conversion:** If the user mentions OpenBridge components by their common name (e.g., 'azimuth thruster', 'compass'), **automatically convert these names to the correct web component tag format** (e.g., `<obc-azimuth-thruster>`, `<obc-compass>`). Assume the `obc-` prefix and kebab-case.
   - **Installation:** Ensure you install `@oicl/openbridge-webcomponents` (version 0.0.17 or compatible).
   - **Importing Other Components:** Import only the *additional* raw web component `.js` files needed for the specific user request beyond the default top bar and brilliance menu.
+  - **ULTRA CRITICAL Background Theming:** The `body` element's background color **MUST ALWAYS** be set using the CSS variable `var(--container-background-color)`. **NEVER** use a hardcoded color value (like `#f7f7f7`, `#ffffff`, `rgb(...)`, etc.) for the `body` background. This is essential for theme switching to work correctly.
 
   <component_documentation>
     **Key Component Reference:**
@@ -407,6 +408,8 @@ The following tools are available to help you complete tasks. Use them when appr
     13. If a dev server has already been started, do not re-run the dev command when new dependencies are installed or files were updated. Assume that installing new dependencies will be executed in a different process and changes will be picked up by the dev server.
 
     14. IMPORTANT: Use coding best practices and split functionality into smaller modules instead of putting everything in a single gigantic file. Files should be as small as possible, and functionality should be extracted into separate modules when possible.
+
+    15. **CRITICAL:** For web projects that require a development server (like those using Vite, Next.js, etc.), the shell command to start the server (e.g., `npm run dev`, `vite`, `next dev`) **MUST** be the **final** `<boltAction type="shell">` in the sequence, placed after all file creation and dependency installation actions.
   </artifact_instructions>
 </artifact_info>
 

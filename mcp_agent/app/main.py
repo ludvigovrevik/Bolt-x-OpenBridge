@@ -21,7 +21,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import List, Dict
+from typing import List, Dict, Any, Optional # Added Any, Optional
 import os
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
@@ -40,11 +40,16 @@ from .prompts.artifact_prompt import get_prompt
 from .load_model import load_model
 from .graph import create_agent_graph, AgentState
 #from .prompt import get_prompt
+import logging # Add logging import
 
 load_dotenv()
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 class ConfigLLM(BaseModel):
-    model_name: str = os.getenv("LLM_MODEL_NAME", "gpt-4o")
+    model_name: str = os.getenv("LLM_MODEL_NAME", "gpt-4.1")
     temperature: float = 0.0
 
 # Update the MCPAgent class with these key changes
@@ -144,8 +149,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Define a more specific type for the message data if needed, or use Any
+class MessageData(BaseModel):
+    imageData: Optional[str] = None
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+    data: Optional[MessageData] = None
+
 class ChatRequest(BaseModel):
-    messages: List[Dict[str, str]]
+    messages: List[ChatMessage] # Use the new ChatMessage model
     thread_id: str = "default"
     stream: bool = True
 
@@ -167,60 +181,103 @@ async def shutdown_event():
 
 @app.post("/api/chat")
 async def chat_endpoint(request: ChatRequest):
+    logger.info("--- Entering chat_endpoint ---") # Log entry
     # Convert request messages to BaseMessage instances
     try:
-        user_messages = []
-        for msg in request.messages:
-            role = msg['role']
-            content = msg['content']
-            if role == 'user':
-                user_messages.append(HumanMessage(content=content))  # Fixed variable name
+        langchain_messages: List[BaseMessage] = [] # Renamed and typed for clarity
+        num_messages = len(request.messages)
+        for i, msg in enumerate(request.messages):
+            role = msg.role
+            content = msg.content
+            is_last_message = (i == num_messages - 1) # Restore check
 
-        print(f"Processed messages: {user_messages}")
+            if role == 'user':
+                # Restore multimodal check for the last message
+                image_data = msg.data.imageData if msg.data and msg.data.imageData and is_last_message else None
+
+                if image_data:
+                    # Create multimodal message if image data exists in the last message
+                    message_content = [
+                        {"type": "text", "text": content},
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": image_data} # Assuming image_data is a base64 data URL
+                        }
+                    ]
+                    langchain_messages.append(HumanMessage(content=message_content))
+                    print(f"Processed multimodal user message: {content[:50]}... + Image")
+                else:
+                    # Regular text message
+                    langchain_messages.append(HumanMessage(content=content))
+            elif role == 'assistant':
+                 # Handle assistant messages if needed
+                 langchain_messages.append(AIMessage(content=content))
+            # Add other roles (system, tool) if necessary
+
+        print(f"Processed LangChain messages: {langchain_messages}") # Updated print statement
 
         async def event_stream():
             config = {"configurable": {"thread_id": request.thread_id}}
             artifact_stack = []  # Track nested artifacts
             buffer = ""  # Buffer for incomplete tags
 
+            logger.info("--- Starting agent event stream ---") # Log before loop
             async for event in app.state.agent.astream_events(
-                input=user_messages,
+                input=langchain_messages, # Corrected: Pass the list directly
                 config=config
+                # Removed incorrect stream_mode argument here
             ):
-                if event["event"] == "on_chat_model_stream":
-                    chunk = event["data"]["chunk"]
-                    content = chunk.content
-                    processed_content = "" # Accumulator for text from structured chunks
+                event_name = event.get("event")
+                logger.info(f"--- Agent Event Received: {event_name} ---") # Log inside loop
 
+                # Focus ONLY on the event carrying content chunks from the LLM stream
+                if event_name == "on_chat_model_stream":
+                    chunk_data = event.get("data", {}).get("chunk")
+                    if not chunk_data:
+                        logger.warning("Event 'on_chat_model_stream' had no chunk data.")
+                        continue
+
+                    # Extract content from the chunk (AIMessageChunk)
+                    content = chunk_data.content
+                    if content is None: # Skip if content is None
+                        continue
+
+                    logger.debug(f"Raw chunk content: {content}") # Debug log for raw content
+
+                    # --- Process and Yield Logic ---
+                    processed_content = "" # Accumulator for text from structured chunks (if applicable)
                     if isinstance(content, str):
                         processed_content = content
-                    elif isinstance(content, list):
-                        # Handle list content (likely from Anthropic)
+                    elif isinstance(content, list): # Handle potential list format (e.g., Anthropic)
                         for item in content:
                             if isinstance(item, dict) and 'text' in item and isinstance(item['text'], str):
                                 processed_content += item['text']
-                        if not processed_content: # If no text was extracted
-                             print(f"Warning: List chunk did not contain expected 'text' field: {content}")
-                             continue # Skip this chunk
+                        if not processed_content:
+                             logger.warning(f"List chunk did not contain expected 'text' field: {content}")
+                             continue
                     else:
-                        # Skip other unexpected types
-                        print(f"Warning: Skipping unexpected content type: {type(content)}")
+                        logger.warning(f"Skipping unexpected content type in chunk: {type(content)}")
                         continue
 
                     # Process the extracted/original content string with any buffered data
                     to_process = buffer + processed_content
-                    buffer = ""
+                    buffer = "" # Clear buffer before processing
 
+                    logger.debug(f"Processing content for yielding: '{to_process}'")
+
+                    # --- Artifact Parsing Logic (remains the same) ---
                     while to_process:
                         if artifact_stack:
                             # Inside an artifact - look for closing tag
                             close_pos = to_process.find("</boltArtifact>")
                             if close_pos != -1:
-                                # Found closing tag - emit content up to close tag
+                                # Found closing tag - yield content up to close tag
                                 artifact_content = to_process[:close_pos]
+                                # Removed logging
                                 yield artifact_content
 
                                 # Emit closing tag
+                                # Removed logging
                                 yield '</boltArtifact>'
 
                                 artifact_stack.pop()
@@ -228,21 +285,24 @@ async def chat_endpoint(request: ChatRequest):
                             else:
                                 # No closing tag yet - buffer all content
                                 buffer = to_process
+                                logger.debug(f"Buffering inside artifact: '{buffer}'")
                                 break
                         else:
                             # Outside artifact - look for opening tag
                             open_pos = to_process.find("<boltArtifact")
                             if open_pos != -1:
-                                # Found opening tag - emit content before tag
+                                # Found opening tag - yield content before tag
                                 if open_pos > 0:
                                     plain_text = to_process[:open_pos]
+                                    # Removed logging
                                     yield plain_text
 
                                 # Find end of opening tag
                                 tag_end_pos = to_process.find(">", open_pos)
                                 if tag_end_pos != -1:
-                                    # Complete tag found - emit it
+                                    # Complete tag found - yield it
                                     tag_content = to_process[open_pos:tag_end_pos + 1]
+                                    # Removed logging
                                     yield tag_content
 
                                     artifact_stack.append(True)  # Mark we're in an artifact
@@ -250,14 +310,28 @@ async def chat_endpoint(request: ChatRequest):
                                 else:
                                     # Incomplete tag - buffer for next chunk
                                     buffer = to_process[open_pos:]
+                                    logger.debug(f"Buffering incomplete opening tag: '{buffer}'")
                                     break
                             else:
-                                # No tags - emit all as plain text
+                                # No tags - yield all as plain text
+                                # Removed logging
                                 yield to_process
+                                to_process = "" # Ensure loop terminates
                                 break
+                # --- End of Artifact Parsing Logic ---
+                # else: # Optionally handle other event types if needed for debugging
+                #    logger.info(f"Other event data: {event.get('data')}")
 
-            final_state = app.state.agent.graph.get_state(config).values
-            print(f"Final state: {final_state}")
+            # Handle any remaining buffer content after the loop finishes
+            if buffer:
+                # Removed logging
+                yield buffer
+
+            # Final state logging (optional, might be noisy)
+            # final_state = app.state.agent.graph.get_state(config).values
+            # print(f"Final state: {final_state}")
+            # Let's comment out the final state print for now as it might change
+            # Removed the extra pass and duplicated final_state print
 
         print("Finished graph execution!")
         return StreamingResponse(event_stream(), media_type="text/event-stream")
