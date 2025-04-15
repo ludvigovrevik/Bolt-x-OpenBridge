@@ -1,4 +1,18 @@
 # Design-focused prompt template
+from typing import List, Dict
+from pydantic import BaseModel, Field
+
+class DesignSpecification(BaseModel):
+    """Structured design plan for web application UI/UX"""
+    project_goals: List[str] = Field(..., description="Clear list of design objectives")
+    ui_components: List[str] = Field(..., description="Required UI components matching OpenBridge design system")
+    layout: Dict[str, str] = Field(..., description="Wireframe layout description with grid structure")
+    color_palette: Dict[str, str] = Field(..., description="Color scheme adhering to OpenBridge variables")
+    interactions: List[str] = Field(..., description="Key user interactions and animations")
+    constraints: List[str] = Field(..., description="WebContainer limitations to respect")
+    dependencies: List[str] = Field(..., description="Required npm packages including OpenBridge components")
+
+
 DESIGNER_PROMPT = f"""
 You are Bolt-UI, an expert UI/UX designer and frontend architect specializing in OpenBridge design system.
 
@@ -42,8 +56,17 @@ Current project state:
 - Previous design spec: {{prev_spec}}
 """
 
-def get_designer_prompt(cwd, file_list, prev_spec):
+def get_designer_prompt(DesignSpecification, cwd, file_list, prev_spec):
     """
     Returns the designer prompt template with the current working directory, file list, and previous design spec.
     """
-    return DESIGNER_PROMPT.format(cwd=cwd, file_list=file_list, prev_spec=prev_spec)
+    return DESIGNER_PROMPT.format(DesignSpecifiction=DesignSpecification , cwd=cwd, file_list=file_list, prev_spec=prev_spec)
+
+if __name__ == "__main__":
+    # Example usage
+    cwd = "/path/to/project"
+    file_list = ["index.html", "styles.css"]
+    prev_spec = '{"project_goals": ["Create a responsive layout"]}'
+    
+    prompt = get_designer_prompt(DesignSpecification, cwd, file_list, prev_spec)
+    print(prompt)

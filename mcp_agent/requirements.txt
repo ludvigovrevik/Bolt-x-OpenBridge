@@ -60,7 +60,6 @@ markdown-it-py==3.0.0
 MarkupSafe==3.0.2
 marshmallow==3.26.1
 mcp==1.6.0
-mcp-agent @ file:///home/teodorrk/projects/Bolt-x-OpenBridge/mcp_agent
 mcp-use==1.1.5
 mdurl==0.1.2
 multidict==6.4.3

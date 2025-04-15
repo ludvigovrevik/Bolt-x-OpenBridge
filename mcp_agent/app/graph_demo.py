@@ -9,7 +9,7 @@ import json
 import operator
 from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, Field
-from .prompts import DESIGNER_PROMPT, DESIGN_CONSTRAINTS
+from .prompts import get_
 
 class AgentState(BaseModel):
     """State of the agent."""
@@ -20,23 +20,13 @@ class AgentState(BaseModel):
     model_name : str = "gpt-4o"  # Default model name
     """Extended state with design specifications"""
 
-class DesignSpecification(BaseModel):
-    """Structured design plan for web application UI/UX"""
-    project_goals: List[str] = Field(..., description="Clear list of design objectives")
-    ui_components: List[str] = Field(..., description="Required UI components matching OpenBridge design system")
-    layout: Dict[str, str] = Field(..., description="Wireframe layout description with grid structure")
-    color_palette: Dict[str, str] = Field(..., description="Color scheme adhering to OpenBridge variables")
-    interactions: List[str] = Field(..., description="Key user interactions and animations")
-    constraints: List[str] = Field(..., description="WebContainer limitations to respect")
-    dependencies: List[str] = Field(..., description="Required npm packages including OpenBridge components")
-
 class EnhancedAgentState(AgentState):
     """Extended state with design specifications"""
     design_spec: Optional[DesignSpecification] = None
     current_files: Dict[str, str] = Field(default_factory=dict)
     implementation_plan: List[str] = Field(default_factory=list)
 
-def create_design_agent_graph(llm, tools, prompt=DESIGNER_PROMPT, checkpointer=None):
+def create_agent_graph(llm, tools, prompt=DESIGNER_PROMPT, checkpointer=None):
     workflow = StateGraph(EnhancedAgentState)
     
     # Design-specific nodes

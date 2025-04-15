@@ -51,6 +51,7 @@ class MCPAgent:
         current_file_path = os.path.abspath(__file__)
         self.repo_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file_path)))
         self.frontend = os.path.join(self.repo_root, "app")
+        print(self.repo_root)
         self.mcp_servers = {
             "filesystem": {
                 "command": "npx",
