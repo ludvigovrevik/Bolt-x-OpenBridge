@@ -38,7 +38,7 @@ from json import JSONEncoder
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from .prompts.artifact_prompt import get_prompt
 from .load_model import load_model
-from .graph_demo import create_agent_graph, AgentState
+from .graph import create_agent_graph, AgentState
 #from .prompt import get_prompt
 
 load_dotenv()

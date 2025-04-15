@@ -24,7 +24,10 @@ def create_agent_graph(tools, checkpointer=None):
     # Define nodes
     async def call_model(state: AgentState, config: RunnableConfig):
         # Use the provided prompt template
-        system_message = SystemMessage(content=get_prompt())
+        system_message = SystemMessage(content=get_prompt(
+            cwd=state.cwd,
+            tools=tools,
+            ))
         inputs = [system_message] + state.messages
         llm = load_model(model_name=state.model_name, tools=tools)
         response = await llm.ainvoke(inputs, config=config)

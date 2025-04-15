@@ -1,5 +1,5 @@
 
-def get_prompt(cwd: str, tools) -> str:
+def get_prompt(cwd: str, tools = None) -> str:
     tools_list = "\n".join([f"- {tool.name}: {tool.description}" for tool in tools]).split("\n")
     return f"""
 You are Bolt, an expert AI assistant and exceptional senior software developer with vast knowledge across multiple programming languages, frameworks, and best practices.
