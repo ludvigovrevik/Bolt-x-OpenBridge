@@ -36,17 +36,21 @@ import json # Add json import
 from contextlib import asynccontextmanager
 from json import JSONEncoder
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from .prompt import get_prompt
+from .prompts.artifact_prompt import get_prompt
 from .load_model import load_model
 from .graph import create_agent_graph, AgentState
 #from .prompt import get_prompt
 
 load_dotenv()
 
+class ConfigLLM(BaseModel):
+    model_name: str = os.getenv("LLM_MODEL_NAME", "gpt-4o")
+    temperature: float = 0.0
+
 # Update the MCPAgent class with these key changes
 class MCPAgent:
     def __init__(self):
-        self.llm = None
+        self.llm = ConfigLLM
         # Update repo_root to point to Bolt-x-OpenBridge (3 dirs up from main.py)
         current_file_path = os.path.abspath(__file__)
         self.repo_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file_path)))
@@ -91,12 +95,6 @@ class MCPAgent:
 
     async def initialize(self):
         self.tools, self.cleanup_func = await convert_mcp_to_langchain_tools(self.mcp_servers)
-        self.llm = load_model(model_name="gpt-4o", tools=self.tools)
-        self.prompt = self.create_prompt(os.getcwd())
-        print(f"Prompt: {self.prompt}")
-        
-#        self.llm = load_model(model_name="claude-3-5-sonnet-20240620", tools=self.tools)
-
         # Remove the nested initialize function and create the graph directly
         if self.tools:
             self.graph = create_agent_graph(
@@ -120,6 +118,8 @@ class MCPAgent:
     async def astream_events(self, input: List[BaseMessage], config: dict):
         # Convert input messages to AgentState format
         initial_state = AgentState(
+            cwd=os.getcwd(),
+            model_name=self.llm.model_name,
             messages=input,
             agent_outcome=None,
             return_direct=False,

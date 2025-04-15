@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 class AgentState(BaseModel):
     """State of the agent."""
+    cwd: str = Field(default=".", description="Current working directory")
     messages: Annotated[Sequence[BaseMessage], operator.add]
     agent_outcome: Union[AgentAction, AgentFinish, None] = None
     return_direct: bool = False
