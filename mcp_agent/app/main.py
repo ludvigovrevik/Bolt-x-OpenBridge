@@ -69,17 +69,17 @@ class MCPAgent:
             "mcp-figma": {
                 "command": "npx",
                 "args": [
-                    "-y", 
+                    "-y",
                     "mcp-figma"
                 ]
-            },  
-            "sequential-thinking": {
-                "command": "npx",
-                "args": [
-                    "-y",
-                    "@modelcontextprotocol/server-sequential-thinking"
-                ]
-            }, 
+            },
+#             "sequential-thinking": {
+#                 "command": "npx",
+#                 "args": [
+#                     "-y",
+#                     "@modelcontextprotocol/server-sequential-thinking"
+#                 ]
+#             },
             }
         self.tools = None
         self.cleanup_func = None
@@ -103,7 +103,7 @@ class MCPAgent:
             )
         else:
             raise Exception("No tools were loaded from MCP servers")
-        
+
     # Add output formatting middleware
     async def format_response(self, content): # Removed type hint for flexibility
         """Ensure proper XML tag formatting in model responses"""

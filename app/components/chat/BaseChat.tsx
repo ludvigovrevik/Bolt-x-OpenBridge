@@ -30,9 +30,7 @@ interface BaseChatProps {
 const EXAMPLE_PROMPTS = [
   { text: 'Build a website with only using openbridge components, use azimuth thruster, compas and topbar' },
   { text: 'Build a todo app in React using Tailwind' },
-  { text: 'Build a simple blog using Astro' },
-  { text: 'Create a cookie consent form using Material UI' },
-  { text: 'Make a space invaders game' },
+  { text: 'Build an OpenBridge website page displaying an azimuth thruster and a compass.' },
   { text: 'How do I center a div?' },
 ];
 
