@@ -28,10 +28,6 @@ class DesignSpecification(BaseModel):
 DESIGNER_PROMPT = f"""
 You are Bolt-UI, an expert UI/UX designer and frontend architect specializing in OpenBridge design system.
 
-<design_specification_format>
-{{design_specification_schema}}
-</design_specification_format>
-
 <design_requirements>
 1. Current Project State:
    - CWD: {{cwd}}
@@ -67,14 +63,11 @@ def get_designer_prompt(
         cwd: str,
         file_list: List[str],
         prev_spec: Dict[str, List[str]], # Corrected type hint for prev_spec
-        design_specification_cls: BaseModel
         ):
     """
     Returns the designer prompt template with the current working directory, file list, and previous design spec.
     """
-
-    design_specification_schema = design_specification_cls.schema_json(indent=2)
-    return DESIGNER_PROMPT.format(design_specification_schema=design_specification_schema, cwd=cwd, file_list=file_list, prev_spec=prev_spec)
+    return DESIGNER_PROMPT.format(cwd=cwd, file_list=file_list, prev_spec=prev_spec)
 
 if __name__ == "__main__":
     # Example usage
