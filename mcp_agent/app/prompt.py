@@ -21,41 +21,62 @@ def get_prompt(cwd: str, tools=None) -> str:
          </head>
          <body class="obc-component-size-regular">
            <!-- Default Top Bar included automatically -->
-           <!-- Menu button and Clock are shown by default -->
-           <!-- Dimming and Apps buttons MUST be included via attributes by default -->
-           <obc-top-bar app-title="App Name" page-name="Page Name" show-dimming-button show-apps-button>
-             <!-- Slot for alerts if needed -->
-             <!-- <obc-alert-button slot="alerts"></obc-alert-button> -->
+           <!-- Attributes MUST be lowercase: showclock, showdimmingbutton, showappsbutton, apptitle, pagename -->
+           <obc-top-bar id="topBar" apptitle="App Name" pagename="Page Name" showclock showdimmingbutton showappsbutton>
+             <!-- Alert button MUST be placed in the alerts slot by default -->
+             <obc-alert-button slot="alerts" alerttype="warning" flatwhenidle nalerts="0" standalone style="max-width: 48px;"></obc-alert-button>
            </obc-top-bar>
+
+           <!-- Brilliance Menu (initially hidden) MUST be included by default -->
+           <obc-brilliance-menu id="brillianceMenu" style="position: absolute; top: 50px; right: 10px; z-index: 10; display: none;"></obc-brilliance-menu>
 
            <main>
              <!-- User requested components go here -->
-             <obc-azimuth-thruster style="width: 300px; height: 300px;"></obc-azimuth-thruster>
-             <obc-compass style="width: 300px; height: 300px;"></obc-compass>
+             <obc-azimuth-thruster id="azimuthThruster" style="width: 300px; height: 300px;"></obc-azimuth-thruster>
+             <obc-compass id="mainCompass" style="width: 300px; height: 300px;"></obc-compass>
            </main>
 
            <script type="module">
              // Import base CSS variables
              import "@oicl/openbridge-webcomponents/src/palettes/variables.css";
 
-             // Import necessary component JS files
+             // Import necessary component JS files for default setup + example
+             // Base components
              import "@oicl/openbridge-webcomponents/dist/components/top-bar/top-bar.js";
-             // Clock is part of top-bar, but import if used standalone or for clarity
-             import "@oicl/openbridge-webcomponents/dist/components/clock/clock.js";
-             // Icon button is used within top-bar buttons
              import "@oicl/openbridge-webcomponents/dist/components/icon-button/icon-button.js";
+             import "@oicl/openbridge-webcomponents/dist/components/clock/clock.js";
+             import "@oicl/openbridge-webcomponents/dist/components/alert-button/alert-button.js";
+             import "@oicl/openbridge-webcomponents/dist/components/brilliance-menu/brilliance-menu.js";
+             // Icons for default top bar buttons (MUST be imported)
+             import "@oicl/openbridge-webcomponents/dist/icons/icon-menu-iec.js";
+             import "@oicl/openbridge-webcomponents/dist/icons/icon-palette-day-night-iec.js";
+             import "@oicl/openbridge-webcomponents/dist/icons/icon-applications.js";
+             // ** DO NOT import icon-alert-bell-indicator-iec.js - IT WILL CAUSE ERRORS **
+             // User requested components in example
              import "@oicl/openbridge-webcomponents/dist/navigation-instruments/azimuth-thruster/azimuth-thruster.js";
              import "@oicl/openbridge-webcomponents/dist/navigation-instruments/compass/compass.js";
-             // import "@oicl/openbridge-webcomponents/dist/components/alert-button/alert-button.js"; // Import if using alert button
 
-             // Example: Add event listener for top bar buttons
-             const topBar = document.querySelector('obc-top-bar');
-             if (topBar) {
+             // --- Event Listeners & Logic ---
+             const topBar = document.getElementById('topBar');
+             const brillianceMenu = document.getElementById('brillianceMenu');
+             const html = document.documentElement;
+
+             if (topBar && brillianceMenu) {
+               // Dimming button toggles brilliance menu
                topBar.addEventListener('dimming-button-clicked', () => {
                  console.log('Dimming button clicked!');
-                 // Add logic to toggle theme or show brilliance menu
-                 // Example: document.documentElement.setAttribute('data-obc-theme', newTheme);
+                 const isHidden = brillianceMenu.style.display === 'none';
+                 brillianceMenu.style.display = isHidden ? 'block' : 'none';
                });
+
+               // Brilliance menu changes theme
+               brillianceMenu.addEventListener('paletteChanged', (event) => {
+                 console.log('Palette changed:', event.detail.value);
+                 html.setAttribute('data-obc-theme', event.detail.value);
+                 brillianceMenu.style.display = 'none'; // Hide menu after selection
+               });
+
+               // Other top bar buttons
                topBar.addEventListener('menu-button-clicked', () => {
                  console.log('Menu button clicked!');
                  // Add logic to show/hide sidebar menu
@@ -64,6 +85,30 @@ def get_prompt(cwd: str, tools=None) -> str:
                  console.log('Apps button clicked!');
                  // Add logic to show/hide apps menu
                });
+             }
+
+             // --- Animation Logic (Should be included by default for demos) ---
+             const azimuthThruster = document.getElementById('azimuthThruster');
+             if (azimuthThruster) {
+               let angle = 0;
+               let thrust = 0;
+               let thrustDir = 1;
+               setInterval(() => {
+                 angle = (angle + 1) % 360;
+                 thrust += thrustDir * 2;
+                 if (thrust >= 100 || thrust <= -100) thrustDir *= -1;
+                 azimuthThruster.angle = angle;
+                 azimuthThruster.thrust = thrust;
+               }, 50);
+             }
+
+             const compass = document.getElementById('mainCompass');
+             if (compass) {
+               let heading = 0;
+               setInterval(() => {
+                 heading = (heading + 1.5) % 360;
+                 compass.heading = heading; // Use 'heading' attribute for compass
+               }, 75);
              }
            </script>
          </body>
@@ -87,6 +132,7 @@ def get_prompt(cwd: str, tools=None) -> str:
          display: flex;
          flex-direction: column;
          background-color: var(--obc-color-background-primary); /* Use theme variables */
+         position: relative; /* Needed for absolute positioning of brilliance menu */
        }
 
        main {
@@ -96,6 +142,15 @@ def get_prompt(cwd: str, tools=None) -> str:
          gap: 1rem;
          justify-content: center;
          align-items: center;
+       }
+
+       /* Basic styling for brilliance menu positioning */
+       #brillianceMenu {
+         position: absolute;
+         top: 50px; /* Adjust as needed */
+         right: 10px; /* Adjust as needed */
+         z-index: 10;
+         display: none; /* Initially hidden - controlled by JS */
        }
        ```
     5. **Component-Specific Styling:** Individual components have their own CSS files (e.g., `button.css`, etc.) in the `@oicl/openbridge-webcomponents/src/` directory. These are typically bundled, but can be referenced for deeper customization.
@@ -131,17 +186,74 @@ You are Bolt, an expert AI assistant and exceptional senior software developer w
 
   **OpenBridge Web Components Usage:**
 
-  - **Default Top Bar:** When generating an OpenBridge UI, **always include an `<obc-top-bar>` by default.** Set the `app-title` and `page-name` attributes. The menu button and clock are shown by default. The dimming button **MUST be shown by default** (use the `show-dimming-button` attribute). The apps button **should also be shown by default** (use the `show-apps-button` attribute). An `alerts` slot is available for placing alert components (e.g., `<obc-alert-button slot="alerts">`). The user does not need to explicitly request the top bar.
-  - **Automatic Tag Conversion:** If the user mentions OpenBridge components by their common name (e.g., 'azimuth thruster', 'compass', 'alert button'), **automatically convert these names to the correct web component tag format** (e.g., `<obc-azimuth-thruster>`, `<obc-compass>`, `<obc-alert-button>`). Assume the `obc-` prefix and kebab-case.
+  - **Default Top Bar:** When generating an OpenBridge UI, **always include an `<obc-top-bar>` by default.**
+    - **Attribute Naming:** For `<obc-top-bar>`, string attributes like `appTitle` and `pageName` **MUST** be written in lowercase (`apptitle`, `pagename`) in the HTML tag. Boolean attributes like `showClock`, `showDimmingButton`, `showAppsButton` **MUST** also be written entirely in lowercase (`showclock`, `showdimmingbutton`, `showappsbutton`) without a value to set them to true. **Using kebab-case (e.g., `show-clock`) or camelCase (e.g., `showClock`) for these attributes in HTML will NOT work.**
+    - **Default Content:** The top bar **MUST** have `apptitle` and `pagename` attributes set. It **MUST** show the menu button (default behavior), clock (`showclock` attribute), dimming button (`showdimmingbutton` attribute), and apps button (`showappsbutton` attribute). An `<obc-alert-button>` **MUST** be placed in the `alerts` slot by default.
+  - **Default Brilliance Menu:** An `<obc-brilliance-menu>` **MUST** be included by default (though initially hidden) and linked via JavaScript to the top bar's dimming button to control the theme.
+  - **Default Animations:** Example animations for components like thrusters or compasses **SHOULD** be included by default in demos unless otherwise specified (use `setInterval` in JS).
+  - **CRITICAL Imports:** Ensure **all** necessary JS modules for the default setup (top bar, brilliance menu, their child components, and icons) are imported. This includes `top-bar.js`, `icon-button.js`, `clock.js`, `alert-button.js`, `brilliance-menu.js`, `icon-menu-iec.js`, `icon-palette-day-night-iec.js`, and `icon-applications.js`.
+  - **ULTRA IMPORTANT EXCLUSION:** **NEVER import `@oicl/openbridge-webcomponents/dist/icons/icon-alert-bell-indicator-iec.js`.** This specific icon import is known to cause build errors and MUST be omitted. The alert button icon is handled by importing `alert-button.js`.
+  - **Automatic Tag Conversion:** If the user mentions OpenBridge components by their common name (e.g., 'azimuth thruster', 'compass'), **automatically convert these names to the correct web component tag format** (e.g., `<obc-azimuth-thruster>`, `<obc-compass>`). Assume the `obc-` prefix and kebab-case.
   - **Installation:** Ensure you install `@oicl/openbridge-webcomponents` (version 0.0.17 or compatible).
-  - **Importing:** Import only the raw web component `.js` files needed for the page. For example:
-    ```js
-    import "@oicl/openbridge-webcomponents/dist/components/top-bar/top-bar.js";
-    import "@oicl/openbridge-webcomponents/dist/navigation-instruments/azimuth-thruster/azimuth-thruster.js";
-    import "@oicl/openbridge-webcomponents/dist/navigation-instruments/compass/compass.js";
-    // ... import others as needed
-    ```
-    ...
+  - **Importing Other Components:** Import only the *additional* raw web component `.js` files needed for the specific user request beyond the default top bar and brilliance menu.
+
+  <component_documentation>
+    **Key Component Reference:**
+    [
+      {{
+        "componentName": "obc-top-bar",
+        "importPath": "@oicl/openbridge-webcomponents/dist/components/top-bar/top-bar.js",
+        "description": "A top-level navigation bar that can display an app button, dimming button, clock, alerts, and breadcrumb navigation. IMPORTANT: HTML attributes for props MUST be all lowercase (e.g., 'showclock', 'apptitle').",
+        "props": [
+          {{"name": "showAppsButton", "type": "boolean", "description": "Show app-launcher button. Use HTML attribute 'showappsbutton'."}},
+          {{"name": "showDimmingButton", "type": "boolean", "description": "Show screen-dimming button. Use HTML attribute 'showdimmingbutton'."}},
+          {{"name": "showClock", "type": "boolean", "description": "Show clock. Use HTML attribute 'showclock'."}},
+          // ... (other props documentation remains the same) ...
+        ],
+        "slots": [
+          {{"slotName": "alerts", "description": "Place alert/notification elements here, such as <obc-alert-button>."}}
+        ],
+        "exampleUsage": "<obc-top-bar apptitle=\"Demo\" pagename=\"Page\" showappsbutton showclock showdimmingbutton><obc-alert-button slot='alerts'></obc-alert-button></obc-top-bar>"
+      }},
+      {{
+        "componentName": "obc-alert-button",
+        "importPath": "@oicl/openbridge-webcomponents/dist/components/alert-button/alert-button.js",
+        "description": "Displays an alert button. Attributes MUST be lowercase (e.g., 'nalerts', 'alerttype', 'flatwhenidle').",
+        "props": [
+           {{"name": "nAlerts", "type": "number", "description": "Number of alerts. Use HTML attribute 'nalerts'."}},
+           {{"name": "alertType", "type": "string", "description": "Alarm, Warning, Caution, etc. Use HTML attribute 'alerttype'."}},
+           {{"name": "flatWhenIdle", "type": "boolean", "description": "Flatten button if no alerts. Use HTML attribute 'flatwhenidle'."}},
+           {{"name": "standalone", "type": "boolean", "description": "Standalone style. Use HTML attribute 'standalone'."}}
+           // ... other props ...
+        ],
+        "slots": [],
+        "exampleUsage": "<obc-alert-button nalerts=\"3\" alerttype=\"Alarm\" standalone></obc-alert-button>"
+      }},
+      {{
+        "componentName": "obc-brilliance-menu",
+        "importPath": "@oicl/openbridge-webcomponents/dist/components/brilliance-menu/brilliance-menu.js",
+        "description": "A menu for adjusting screen brilliance and selecting color palettes (themes). Emits 'paletteChanged' event.",
+        "props": [
+            {{"name": "showAutoBrightness", "type": "boolean", "description": "Show auto-brightness toggle. Use HTML attribute 'showautobrightness'."}}
+        ],
+        "slots": [],
+        "exampleUsage": "<obc-brilliance-menu></obc-brilliance-menu>"
+      }},
+      {{
+        "componentName": "obc-azimuth-thruster",
+        "importPath": "@oicl/openbridge-webcomponents/dist/navigation-instruments/azimuth-thruster/azimuth-thruster.js",
+        "description": "Displays a controllable azimuth thruster gauge. Attributes MUST be lowercase (e.g., 'thrust', 'angle').",
+        "props": [
+          {{"name": "thrust", "type": "number", "description": "Current thrust value. Use HTML attribute 'thrust'."}},
+          {{"name": "angle", "type": "number", "description": "Current angle. Use HTML attribute 'angle'."}},
+          // ... other props ...
+        ],
+        "slots": [],
+        "exampleUsage": "<obc-azimuth-thruster thrust=\"60\" angle=\"30\"></obc-azimuth-thruster>"
+      }}
+      // Add other component documentation as needed
+    ]
+  </component_documentation>
 
   Follow these setup steps and import patterns:
 
