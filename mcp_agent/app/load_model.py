@@ -52,7 +52,7 @@ def load_model(model_name, tools=None, prompt=None, parser=False):
 
     # Create a structured model based on the parser parameter
     if parser:
-        model = model.with_structured_ouput(schema=parser)
+        model = model.with_structured_output(schema=parser)
 
     # Default chain without parser
     return model

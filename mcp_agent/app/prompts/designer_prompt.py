@@ -3,14 +3,14 @@ from pydantic import BaseModel, Field
 
 class DesignSpecification(BaseModel):
     """Structured design plan for web application UI/UX"""
-    project_goals: List[str] = Field(..., 
+    project_goals: List[str] = Field(...,
                    description="Clear list of design objectives and user stories")
     ui_components: List[str] = Field(...,
                    description="Required UI components from OpenBridge design system")
-    layout: Dict[str, str] = Field(...,
-                   description="CSS Grid/Flexbox layout structure with responsive breakpoints")
-    color_palette: Dict[str, str] = Field(...,
-                   description="Color scheme using OpenBridge CSS variables")
+    layout: List[str] = Field(...,
+                   description="CSS layout rules formatted as ['breakpoint:css-grid/flex-declaration', ...]")
+    color_palette: List[str] = Field(...,
+                   description="Color scheme using OpenBridge CSS variables formatted as ['--var-name: value', ...]")
     interactions: List[str] = Field(...,
                    description="User interactions and performance-optimized animations")
     constraints: List[str] = Field(...,
@@ -19,11 +19,10 @@ class DesignSpecification(BaseModel):
                    description="Required npm packages with exact versions")
     file_structure: List[str] = Field(...,
                    description="Required files and directories relative to CWD")
-    build_config: Dict[str, str] = Field(...,
-                   description="Vite configuration and build parameters")
+    build_config: List[str] = Field(...,
+                   description="Vite configuration parameters as ['configKey=value', ...]")
     dev_setup: List[str] = Field(...,
                    description="Development server setup and startup commands")
-    
 
 DESIGNER_PROMPT = f"""
 You are Bolt-UI, an expert UI/UX designer and frontend architect specializing in OpenBridge design system.

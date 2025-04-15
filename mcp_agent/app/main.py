@@ -99,7 +99,6 @@ class MCPAgent:
         if self.tools:
             self.graph = create_agent_graph(
                 self.tools,
-                self.prompt,
                 self.checkpointer
             )
         else:

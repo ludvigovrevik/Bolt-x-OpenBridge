@@ -13,6 +13,7 @@ from .prompts.designer_prompt import get_designer_prompt, DesignSpecification
 from .load_model import load_model
 from .prompts.artifact_prompt import get_prompt
 
+
 class AgentState(BaseModel):
     """State of the agent."""
     cwd: str = Field(default=".", description="Current working directory")
@@ -30,10 +31,7 @@ class EnhancedAgentState(AgentState):
     implementation_plan: List[str] = Field(default_factory=list)
 
 
-######################## AGENTS ##################################
-
-
-def create_agent_graph(tools, prompt, checkpointer=None):
+def create_agent_graph(tools=None, checkpointer=None):
     workflow = StateGraph(EnhancedAgentState)
     
     async def design_spec_generator(state: EnhancedAgentState, config: RunnableConfig):
@@ -46,8 +44,7 @@ def create_agent_graph(tools, prompt, checkpointer=None):
         
         input = [
             SystemMessage(content=system_prompt),
-            state.messages,
-        ]
+        ] + state.messages
         
         struct_llm = load_model(model_name=state.model_name, parser=DesignSpecification)
         design_spec_cls = await struct_llm.ainvoke(input)
@@ -70,8 +67,7 @@ def create_agent_graph(tools, prompt, checkpointer=None):
         input = [
             SystemMessage(content=system_prompt),
             SystemMessage(content=f"Design Specification: {state.design_spec.schema_json()}"),
-            state.messages,
-        ]
+        ] + state.messages
         
         # Generate file implementation plan
         struct_llm = load_model(model_name=state.model_name, parser=list)
@@ -117,8 +113,7 @@ def create_agent_graph(tools, prompt, checkpointer=None):
         
         input = [
             SystemMessage(content=system_prompt),
-            state.messages,
-        ]
+        ] + state.messages
         
         # Generate file content
         implementation_llm = load_model(model_name=state.model_name)

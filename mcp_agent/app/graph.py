@@ -1,7 +1,7 @@
 # graph.py
 from typing import TypedDict, Annotated, Union, Sequence
 from langchain_core.agents import AgentAction, AgentFinish
-from langchain_core.messages import BaseMessage, ToolMessage, AIMessage
+from langchain_core.messages import BaseMessage, ToolMessage, AIMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph, END
 from .load_model import load_model
@@ -9,6 +9,7 @@ import json
 import operator
 from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, Field
+from .prompt import get_prompt
 
 class AgentState(BaseModel):
     """State of the agent."""
@@ -23,7 +24,8 @@ def create_agent_graph(tools, prompt, checkpointer=None):
     # Define nodes
     async def call_model(state: AgentState, config: RunnableConfig):
         # Use the provided prompt template
-        inputs = prompt + state.messages
+        system_message = SystemMessage(content=prompt)
+        inputs = [system_message] + state.messages
         llm = load_model(model_name=state.model_name, tools=tools)
         response = await llm.ainvoke(inputs, config=config)
         return {"messages": [response]}
