@@ -55,7 +55,7 @@ def get_designer_prompt(
         cwd: str,
         file_list: List[str],
         prev_spec: Dict[str, List[str]], # Corrected type hint for prev_spec
-        design_specification_cls: BaseModel = DesignSpecification
+        design_specification_cls: BaseModel
         ):
     """
     Returns the designer prompt template with the current working directory, file list, and previous design spec.
