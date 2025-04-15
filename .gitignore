@@ -28,3 +28,9 @@ dist-ssr
 *.vars
 .wrangler
 _worker.bundle
+
+venv/
+.venv
+
+pnpm-lock.yaml/
+package-lock.json/

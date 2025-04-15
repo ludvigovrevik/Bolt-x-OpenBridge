@@ -32,6 +32,7 @@ from langgraph.prebuilt import create_react_agent
 from langchain_mcp_tools import convert_mcp_to_langchain_tools
 from langgraph.checkpoint.memory import MemorySaver
 import json
+import json # Add json import
 from contextlib import asynccontextmanager
 from json import JSONEncoder
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -93,6 +94,8 @@ class MCPAgent:
         self.prompt = self.create_prompt(os.getcwd())
         print(f"Prompt: {self.prompt}")
         
+        self.llm = load_model(model_name="claude-3-5-sonnet-20240620", tools=self.tools)
+
         # Remove the nested initialize function and create the graph directly
         if self.tools:
             self.graph = create_agent_graph(
@@ -103,21 +106,14 @@ class MCPAgent:
             )
         else:
             raise Exception("No tools were loaded from MCP servers")
-    # Inside the MCPAgent class
-    async def cleanup(self):
-        """Clean up MCP servers and connections"""
-        if self.cleanup_func:
-            print("Cleaning up MCP servers...")
-            await self.cleanup_func()
-        # Add explicit WebSocket cleanup if needed
-        if hasattr(self, 'websocket'):
-            await self.websocket.close()
         
     # Add output formatting middleware
-    async def format_response(self, content: str) -> str:
+    async def format_response(self, content): # Removed type hint for flexibility
         """Ensure proper XML tag formatting in model responses"""
-        content = content.replace("<boltArtifact", "\n<boltArtifact")
-        content = content.replace("</boltArtifact>", "</boltArtifact>\n")
+        if isinstance(content, str): # Check if content is a string
+            content = content.replace("<boltArtifact", "\n<boltArtifact")
+            content = content.replace("</boltArtifact>", "</boltArtifact>\n")
+        # If not a string, return content as is
         return content
 
     async def astream_events(self, input: List[BaseMessage], config: dict):
@@ -128,7 +124,7 @@ class MCPAgent:
             return_direct=False,
             intermediate_steps=[]
         )
-        
+
         # Use proper input format for the graph
         async for event in self.graph.astream_events(
             initial_state,
@@ -180,7 +176,7 @@ async def chat_endpoint(request: ChatRequest):
             content = msg['content']
             if role == 'user':
                 user_messages.append(HumanMessage(content=content))  # Fixed variable name
-        
+
         print(f"Processed messages: {user_messages}")
 
         async def event_stream():
@@ -195,9 +191,25 @@ async def chat_endpoint(request: ChatRequest):
                 if event["event"] == "on_chat_model_stream":
                     chunk = event["data"]["chunk"]
                     content = chunk.content
+                    processed_content = "" # Accumulator for text from structured chunks
 
-                    # Process the content with any buffered data from previous chunks
-                    to_process = buffer + content
+                    if isinstance(content, str):
+                        processed_content = content
+                    elif isinstance(content, list):
+                        # Handle list content (likely from Anthropic)
+                        for item in content:
+                            if isinstance(item, dict) and 'text' in item and isinstance(item['text'], str):
+                                processed_content += item['text']
+                        if not processed_content: # If no text was extracted
+                             print(f"Warning: List chunk did not contain expected 'text' field: {content}")
+                             continue # Skip this chunk
+                    else:
+                        # Skip other unexpected types
+                        print(f"Warning: Skipping unexpected content type: {type(content)}")
+                        continue
+
+                    # Process the extracted/original content string with any buffered data
+                    to_process = buffer + processed_content
                     buffer = ""
 
                     while to_process:

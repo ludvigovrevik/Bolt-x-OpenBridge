@@ -21,6 +21,7 @@ A FastAPI application that integrates MCP (Model Context Protocol) with LangChai
 
 1. Create and activate a virtual environment:
 ```bash
+cd mcp_agent
 python -m venv .venv
 source .venv/bin/activate  # Linux/MacOS
 # or 
