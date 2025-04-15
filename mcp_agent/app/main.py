@@ -50,7 +50,7 @@ class ConfigLLM(BaseModel):
 # Update the MCPAgent class with these key changes
 class MCPAgent:
     def __init__(self):
-        self.llm = ConfigLLM
+        self.llm = ConfigLLM()
         # Update repo_root to point to Bolt-x-OpenBridge (3 dirs up from main.py)
         current_file_path = os.path.abspath(__file__)
         self.repo_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file_path)))
