@@ -33,162 +33,142 @@ class EnhancedAgentState(AgentState):
 ######################## AGENTS ##################################
 
 
-async def design_analyst(state: EnhancedAgentState, config: RunnableConfig):
-    # Get the latest user message
-    latest_user_message = state.messages[-1].content if state.messages else ""
-    
-    # Create a structured prompt for the design analyst
-    design_prompt = f"""
-    You are analyzing a web application design request to create OpenBridge UI components.
-    
-    <user_request>
-    {latest_user_message}
-    </user_request>
-    
-    <current_state>
-    Existing Files: {json.dumps(list(state.current_files.keys()))}
-    Previous Design Spec: {json.dumps(state.design_spec.dict() if state.design_spec else {})}
-    </current_state>
-    
-    Enhance this request with professional UI/UX design considerations for an OpenBridge application.
-    Focus on component selection, layout structure, and visual coherence.
-    """
-    llm = load_model(model_name=state.model_name)
-    # Call the LLM with this focused prompt
-    design_enhanced_prompt = await llm.ainvoke({"prompt": design_prompt})
-    
-    # Return enhanced design analysis as a system message to be part of the context
-    return {"messages": [SystemMessage(content=f"Design Analysis: {design_enhanced_prompt}")]}
-
-
-
-async def spec_generator(state: EnhancedAgentState, config: RunnableConfig):
-    # Generate structured design spec
-    system_prompt = get_designer_prompt(
-        cwd=config.get("cwd", "."),
-        file_list=list(state.current_files.keys()),
-        prev_spec=state.design_spec.dict() if state.design_spec else {}
-    )
-    
-    input = [
-        SystemMessage(content=system_prompt),
-        *state.messages  # Include all conversation context
-    ]
-    
-    # Use the model with the DesignSpecification parser
-    struct_llm = load_model(model_name=state.model_name, parser=DesignSpecification)
-    spec = await struct_llm.ainvoke(input)
-    
-    # Since the model already returns a DesignSpecification object, we can use it directly
-    # No need for DesignSpecification(**spec)
-    return {"design_spec": spec, "messages": [SystemMessage(content=f"Design specification created successfully.")]}
-
-
-
-async def implementation_planner(state: EnhancedAgentState, config: RunnableConfig):
-    if not state.design_spec:
-        return {"messages": [SystemMessage(content="No design specification available for planning.")]}
-    
-    planning_prompt = f"""
-    You are creating an implementation plan based on the design specification for an OpenBridge web application.
-    
-    <design_specification>
-    {json.dumps(state.design_spec.dict(), indent=2)}
-    </design_specification>
-    
-    Create a step-by-step implementation plan that includes:
-    1. File structure
-    2. Required dependencies
-    3. Component hierarchy
-    4. Implementation order
-    """
-    llm = load_model(model_name=state.model_name)
-    # Generate the implementation plan
-    plan_result = await llm.ainvoke({"prompt": planning_prompt})
-    
-    # Create a structured plan
-    implementation_steps = plan_result.strip().split("\n")
-    
-    return {
-        "implementation_plan": implementation_steps,
-        "messages": [SystemMessage(content=f"Implementation plan created with {len(implementation_steps)} steps.")]
-    }
-
-
-
-async def agent_with_artifacts(state: EnhancedAgentState, config: RunnableConfig):
-    # Ensure we have the necessary design info
-    if not state.design_spec:
-        return {"messages": [AIMessage(content="I need more information about the design requirements before I can create the implementation.")]}
-    
-    # Prepare the context with all the design information
-    design_context = f"""
-    <design_specification>
-    Project Goals: {', '.join(state.design_spec.project_goals)}
-    UI Components: {', '.join(state.design_spec.ui_components)}
-    Layout: {json.dumps(state.design_spec.layout, indent=2)}
-    Color Palette: {json.dumps(state.design_spec.color_palette, indent=2)}
-    Interactions: {', '.join(state.design_spec.interactions)}
-    Constraints: {', '.join(state.design_spec.constraints)}
-    Dependencies: {', '.join(state.design_spec.dependencies)}
-    </design_specification>
-    
-    <implementation_plan>
-    {'\n'.join(state.implementation_plan if state.implementation_plan else ["No implementation plan available"])}
-    </implementation_plan>
-    
-    <existing_files>
-    {json.dumps(list(state.current_files.keys()))}
-    </existing_files>
-    """
-    
-    # Create a final prompt that will generate artifacts
-    artifact_prompt = get_prompt(
-        cwd=state.cwd,
-        tools=config.get("tools", [])
-    )
-    
-    # Combine all context into a single message
-    full_context = [
-        SystemMessage(content=
-                      f"{artifact_prompt}\n\n{design_context}"),
-    ] + state.messages
-    llm = load_model(model_name=state.model_name)
-    # Call the model with the artifact-focused prompt
-    artifact_result = await llm.ainvoke(full_context)
-    
-    # Return the result which should contain the boltArtifact structures
-    return {"agent_outcome": artifact_result}
-
-
-
-
-
-
-
-
-def create_agent_graph(llm, tools, prompt, checkpointer=None):
+def create_agent_graph(tools, prompt, checkpointer=None):
     workflow = StateGraph(EnhancedAgentState)
     
-    # Add all nodes
-    workflow.add_node("design_analyst", design_analyst)
-    workflow.add_node("spec_generator", spec_generator)
+    async def design_spec_generator(state: EnhancedAgentState, config: RunnableConfig):
+        # Generate structured design spec
+        system_prompt = get_designer_prompt(
+            cwd=state.cwd,
+            file_list=list(state.current_files.keys()),
+            prev_spec={} if state.design_spec is None else state.design_spec.dict()
+        )
+        
+        input = [
+            SystemMessage(content=system_prompt),
+            state.messages,
+        ]
+        
+        struct_llm = load_model(model_name=state.model_name, parser=DesignSpecification)
+        design_spec_cls = await struct_llm.ainvoke(input)
+        
+        return {"design_spec": design_spec_cls}
+    
+    async def implementation_planner(state: EnhancedAgentState, config: RunnableConfig):
+        """Generate list of files needed based on design spec"""
+        if not state.design_spec:
+            return {"messages": [AIMessage(content="Design specification missing. Please provide requirements first.")]}
+        
+        system_prompt = """Based on the design specification, create a detailed list of files that need to be implemented.
+        For each file, provide:
+        1. File path/name
+        2. Purpose of the file
+        3. Dependencies and relationships with other files
+        Be comprehensive and ensure all necessary files for the complete implementation are included.
+        """
+        
+        input = [
+            SystemMessage(content=system_prompt),
+            SystemMessage(content=f"Design Specification: {state.design_spec.schema_json()}"),
+            state.messages,
+        ]
+        
+        # Generate file implementation plan
+        struct_llm = load_model(model_name=state.model_name, parser=list)
+        files_to_generate = await struct_llm.ainvoke(input)
+        
+        # Update state with files that need to be created
+        return {
+            "files_to_generate": files_to_generate,
+            "pending_files": [file["path"] for file in files_to_generate],
+            "messages": [AIMessage(content=f"Created implementation plan with {len(files_to_generate)} files to generate.")]
+        }
+    
+    async def file_selector(state: EnhancedAgentState, config: RunnableConfig):
+        """Select next file to implement from pending files"""
+        if not state.pending_files:
+            return {"messages": [AIMessage(content="All files have been generated.")], "current_file_focus": None}
+        
+        next_file = state.pending_files[0]
+        pending_files = state.pending_files[1:]  # Remove the selected file
+        
+        file_details = next((file for file in state.files_to_generate if file["path"] == next_file), None)
+        
+        return {
+            "current_file_focus": next_file,
+            "pending_files": pending_files,
+            "messages": [AIMessage(content=f"Working on file: {next_file}\nPurpose: {file_details.get('purpose', 'N/A')}")],
+        }
+    
+    async def file_generator(state: EnhancedAgentState, config: RunnableConfig):
+        """Generate content for the current focus file"""
+        if not state.current_file_focus:
+            return {"messages": [AIMessage(content="No file selected for generation.")]}
+        
+        file_path = state.current_file_focus
+        file_details = next((file for file in state.files_to_generate if file["path"] == file_path), {})
+        
+        system_prompt = get_prompt(
+            cwd=state.cwd,
+            tools=[],
+            file_details=file_details,
+            design_specification=state.design_spec.model_dump() if state.design_spec else None,
+            )
+        
+        input = [
+            SystemMessage(content=system_prompt),
+            state.messages,
+        ]
+        
+        # Generate file content
+        implementation_llm = load_model(model_name=state.model_name)
+        file_content = await implementation_llm.ainvoke(input)
+        
+        # Update current_files with the new implementation
+        current_files = state.current_files.copy()
+        current_files[file_path] = file_content
+        
+        # Add to completed files
+        completed_files = state.completed_files.copy()
+        completed_files.append(file_path)
+        
+        return {
+            "current_files": current_files,
+            "completed_files": completed_files,
+            "messages": [AIMessage(content=f"Generated file: {file_path}\n\n```\n{file_content}\n```")]
+        }
+    
+    def should_continue_implementation(state: EnhancedAgentState):
+        """Determine if we need to continue generating files or end the graph"""
+        if state.pending_files:
+            return "continue"
+        else:
+            return "end"
+    
+    # Add nodes to the workflow
+    workflow.add_node("design_spec_generator", design_spec_generator)
     workflow.add_node("implementation_planner", implementation_planner)
-    workflow.add_node("agent", agent_with_artifacts)
-    workflow.add_node("tools", tool_node)
+    workflow.add_node("file_selector", file_selector)
+    workflow.add_node("file_generator", file_generator)
+
+    # Define workflow logic
+    workflow.set_entry_point("design_spec_generator")
+    workflow.add_edge("design_spec_generator", "implementation_planner")
     
-    # Set the flow
-    workflow.set_entry_point("design_analyst")
-    workflow.add_edge("design_analyst", "spec_generator")
-    workflow.add_edge("spec_generator", "implementation_planner")
-    workflow.add_edge("implementation_planner", "agent")
+    # Add conditional edge for file generation loop
+    workflow.add_edge("implementation_planner", "file_selector")
     
-    # Conditional tool usage after agent
+    workflow.add_edge("file_selector", "file_generator")
+    
+    # After generating a file, decide whether to continue or end
     workflow.add_conditional_edges(
-        "agent",
-        should_continue,
-        {"continue": "tools", "end": END}
+        "file_generator",
+        should_continue_implementation,
+        {
+            "continue": "file_selector",  # Loop back to select next file
+            "end": END
+        }
     )
-    workflow.add_edge("tools", "agent")
+
     
     return workflow.compile(checkpointer=checkpointer)

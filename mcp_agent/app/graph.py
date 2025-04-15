@@ -19,11 +19,12 @@ class AgentState(BaseModel):
     intermediate_steps: Annotated[list[tuple[AgentAction, str]], operator.add]  = Field(default_factory=list)
     model_name : str = "gpt-4o"  # Default model name
 
-def create_agent_graph(llm, tools, prompt, checkpointer=None):
+def create_agent_graph(tools, prompt, checkpointer=None):
     # Define nodes
     async def call_model(state: AgentState, config: RunnableConfig):
         # Use the provided prompt template
         inputs = prompt + state.messages
+        llm = load_model(model_name=state.model_name, tools=tools)
         response = await llm.ainvoke(inputs, config=config)
         return {"messages": [response]}
 

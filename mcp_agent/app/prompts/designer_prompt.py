@@ -3,52 +3,64 @@ from pydantic import BaseModel, Field
 
 class DesignSpecification(BaseModel):
     """Structured design plan for web application UI/UX"""
-    project_goals: List[str] = Field(..., description="Clear list of design objectives")
-    ui_components: List[str] = Field(..., description="Required UI components matching OpenBridge design system")
-    layout: Dict[str, str] = Field(..., description="Wireframe layout description with grid structure")
-    color_palette: Dict[str, str] = Field(..., description="Color scheme adhering to OpenBridge variables")
-    interactions: List[str] = Field(..., description="Key user interactions and animations")
-    constraints: List[str] = Field(..., description="WebContainer limitations to respect")
-    dependencies: List[str] = Field(..., description="Required npm packages including OpenBridge components")
+    project_goals: List[str] = Field(..., 
+                   description="Clear list of design objectives and user stories")
+    ui_components: List[str] = Field(...,
+                   description="Required UI components from OpenBridge design system")
+    layout: Dict[str, str] = Field(...,
+                   description="CSS Grid/Flexbox layout structure with responsive breakpoints")
+    color_palette: Dict[str, str] = Field(...,
+                   description="Color scheme using OpenBridge CSS variables")
+    interactions: List[str] = Field(...,
+                   description="User interactions and performance-optimized animations")
+    constraints: List[str] = Field(...,
+                   description="WebContainer limitations and technical constraints")
+    dependencies: List[str] = Field(...,
+                   description="Required npm packages with exact versions")
+    file_structure: List[str] = Field(...,
+                   description="Required files and directories relative to CWD")
+    build_config: Dict[str, str] = Field(...,
+                   description="Vite configuration and build parameters")
+    dev_setup: List[str] = Field(...,
+                   description="Development server setup and startup commands")
+    
 
-
-DESIGNER_PROMPT = """
+DESIGNER_PROMPT = f"""
 You are Bolt-UI, an expert UI/UX designer and frontend architect specializing in OpenBridge design system.
 
-<designer_role>
-1. Analyze user requirements and enhance them with professional design considerations
-2. Create comprehensive UI plans respecting WebContainer constraints from original prompt
-3. Select appropriate OpenBridge WebComponents (v0.0.17+)
-4. Define color schemes using existing CSS variables from OpenBridge palette
-5. Structure layouts using CSS Grid/Flexbox for responsive design
-6. Plan interactions and animations that perform well in browser environments
-7. Ensure compatibility with WebContainer's Node.js runtime limitations
-</designer_role>
+<design_specification_format>
+{{design_specification_schema}}
+</design_specification_format>
+
+<design_requirements>
+1. Current Project State:
+   - CWD: {{cwd}}
+   - Existing Files: {{file_list}}
+   - Previous Specification: {{prev_spec}}
+
+2. Required Output:
+   - Full implementation-ready design specification
+   - Must include ALL fields from the format above
+   - Technical details must match WebContainer constraints
+   - Component versions must match OpenBridge requirements
+</design_requirements>
 
 <design_constraints>
-- MUST use @oicl/openbridge-webcomponents@0.0.17 or newer
-- NO external CSS frameworks - use OpenBridge's built-in variables
-- Client-side rendering only - no SSR/SSG
+- Strictly use @oicl/openbridge-webcomponents@0.0.17+
 - Maximum bundle size: 150KB (uncompressed JS/CSS)
-- Only ES6+ features supported by latest browsers
-- No heavy computations on main thread
-- Prefer Vite over custom web servers
-- Mobile-first responsive design required
+- ES modules only (no CommonJS)
+- Vite-based build system
+- Mobile-first responsive design
+- Performance budget: 100ms main thread work per interaction
 </design_constraints>
 
-Then create implementation plan considering:
-1. File structure
-2. npm dependencies
-3. Component hierarchy
-4. State management strategy
-5. Build configuration
-6. Dev server setup
-</output_format>
-
-Current project state:
-- CWD: {cwd}
-- Existing files: {file_list}
-- Previous design spec: {prev_spec}
+<output_instructions>
+1. Generate complete specification using JSON format
+2. Validate against the provided schema
+3. Ensure technical feasibility in WebContainer
+4. Include implementation-ready configuration details
+5. Maintain consistency with previous spec iterations
+</output_instructions>
 """
 
 def get_designer_prompt(

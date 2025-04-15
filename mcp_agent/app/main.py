@@ -38,7 +38,7 @@ from json import JSONEncoder
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from .prompts.artifact_prompt import get_prompt
 from .load_model import load_model
-from .graph import create_agent_graph, AgentState
+from .graph_demo import create_agent_graph, AgentState
 #from .prompt import get_prompt
 
 load_dotenv()
@@ -98,7 +98,6 @@ class MCPAgent:
         # Remove the nested initialize function and create the graph directly
         if self.tools:
             self.graph = create_agent_graph(
-                self.llm,
                 self.tools,
                 self.prompt,
                 self.checkpointer
