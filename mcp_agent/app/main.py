@@ -90,11 +90,11 @@ class MCPAgent:
 
     async def initialize(self):
         self.tools, self.cleanup_func = await convert_mcp_to_langchain_tools(self.mcp_servers)
-        self.llm = load_model(model_name="gpt-4o-mini", tools=self.tools)
+        self.llm = load_model(model_name="gpt-4o", tools=self.tools)
         self.prompt = self.create_prompt(os.getcwd())
         print(f"Prompt: {self.prompt}")
         
-        self.llm = load_model(model_name="claude-3-5-sonnet-20240620", tools=self.tools)
+#        self.llm = load_model(model_name="claude-3-5-sonnet-20240620", tools=self.tools)
 
         # Remove the nested initialize function and create the graph directly
         if self.tools:

@@ -50,7 +50,7 @@ def load_model(model_name, tools=None, prompt=None, parser=False):
         chain = prompt | model
         return chain
 
-    # Create a chain based on the parser parameter
+    # Create a structured model based on the parser parameter
     if parser:
         model = model.with_structured_ouput(schema=parser)
 
