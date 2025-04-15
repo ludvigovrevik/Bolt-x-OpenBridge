@@ -4,22 +4,25 @@ from langchain_core.agents import AgentAction, AgentFinish
 from langchain_core.messages import BaseMessage, ToolMessage, AIMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph, END
+from .load_model import load_model
 import json
 import operator
 from langgraph.prebuilt import ToolNode
+from pydantic import BaseModel, Field
 
-class AgentState(TypedDict):
+class AgentState(BaseModel):
+    """State of the agent."""
     messages: Annotated[Sequence[BaseMessage], operator.add]
-    agent_outcome: Union[AgentAction, AgentFinish, None]
-    return_direct: bool
-    intermediate_steps: Annotated[list[tuple[AgentAction, str]], operator.add]
+    agent_outcome: Union[AgentAction, AgentFinish, None] = None
+    return_direct: bool = False
+    intermediate_steps: Annotated[list[tuple[AgentAction, str]], operator.add]  = Field(default_factory=list)
+    model_name : str = "gpt-4o"  # Default model name
 
 def create_agent_graph(llm, tools, prompt, checkpointer=None):
     # Define nodes
     async def call_model(state: AgentState, config: RunnableConfig):
-        print(state)
         # Use the provided prompt template
-        inputs = prompt + state["messages"]
+        inputs = prompt + state.messages
         response = await llm.ainvoke(inputs, config=config)
         return {"messages": [response]}
 
@@ -33,7 +36,7 @@ def create_agent_graph(llm, tools, prompt, checkpointer=None):
 
     # Conditional edges
     def should_continue(state: AgentState):
-        last_msg = state["messages"][-1]
+        last_msg = state.messages[-1]
         if isinstance(last_msg, AIMessage) and last_msg.tool_calls:
             return "continue"
         return "end"

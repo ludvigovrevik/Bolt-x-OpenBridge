@@ -46,35 +46,52 @@ load_dotenv()
 class MCPAgent:
     def __init__(self):
         self.llm = None
-        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        frontend = os.path.join(repo_root, "app")
-        self.folder = frontend
+        # Update repo_root to point to Bolt-x-OpenBridge (3 dirs up from main.py)
+        current_file_path = os.path.abspath(__file__)
+        self.repo_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file_path)))
+        self.frontend = os.path.join(self.repo_root, "app")
         self.mcp_servers = {
             "filesystem": {
                 "command": "npx",
                 "args": [
                     "-y",  # Crucial for non-interactive execution
                     "@modelcontextprotocol/server-filesystem",
-                    os.path.expanduser(self.folder)  # Home directory as root
+                    os.path.expanduser(self.repo_root)  # Home directory as root
                 ],
-                "cwd": os.path.expanduser(self.folder)  # Explicit working directory
+                "cwd": os.path.expanduser(self.repo_root)  # Explicit working directory
+            },
+            "mcp-figma": {
+                "command": "npx",
+                "args": [
+                    "-y", 
+                    "mcp-figma"
+                ]
+            },  
+            "sequential-thinking": {
+                "command": "npx",
+                "args": [
+                    "-y",
+                    "@modelcontextprotocol/server-sequential-thinking"
+                ]
+            }, 
             }
-        }
         self.tools = None
         self.cleanup_func = None
         self.config = {"configurable": {"thread_id": "42"}}
         self.output_parser = None   # Placeholder for output parser
         self.human_in_the_loop = False
-        self.prompt = self.create_prompt(os.getcwd())
+        self.prompt = None
         self.graph = None
         self.checkpointer = MemorySaver()
 
     def create_prompt(self, cwd: str) -> ChatPromptTemplate:
-        return [SystemMessage(content=get_prompt(cwd))]
+        return [SystemMessage(content=get_prompt(cwd, self.tools))]
 
     async def initialize(self):
         self.tools, self.cleanup_func = await convert_mcp_to_langchain_tools(self.mcp_servers)
         self.llm = load_model(model_name="gpt-4o-mini", tools=self.tools)
+        self.prompt = self.create_prompt(os.getcwd())
+        print(f"Prompt: {self.prompt}")
         
         # Remove the nested initialize function and create the graph directly
         if self.tools:
@@ -86,6 +103,15 @@ class MCPAgent:
             )
         else:
             raise Exception("No tools were loaded from MCP servers")
+    # Inside the MCPAgent class
+    async def cleanup(self):
+        """Clean up MCP servers and connections"""
+        if self.cleanup_func:
+            print("Cleaning up MCP servers...")
+            await self.cleanup_func()
+        # Add explicit WebSocket cleanup if needed
+        if hasattr(self, 'websocket'):
+            await self.websocket.close()
         
     # Add output formatting middleware
     async def format_response(self, content: str) -> str:
@@ -132,13 +158,16 @@ class ChatRequest(BaseModel):
 async def startup_event():
     app.state.agent = MCPAgent()
     await app.state.agent.initialize() # Initialize the agent
-    app.state.agent.create_prompt(os.getcwd())  # Initialize the prompt
+    # Additional setup if needed
+    print("Application startup complete")
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     if hasattr(app.state.agent, 'cleanup'):
         await app.state.agent.cleanup()
+    # Additional cleanup if needed
+    print("Application shutdown complete")
 
 
 @app.post("/api/chat")
