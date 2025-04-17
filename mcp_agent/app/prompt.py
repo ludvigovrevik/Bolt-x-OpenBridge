@@ -1,10 +1,17 @@
-#<available_tools>
-#The following tools are available to help you complete tasks. Use them when appropriate:
-#{tools_list}
-#</available_tools>
+def get_prompt(cwd: str, tools=None) -> str:
+    if tools is None:
+        tools = [] # Handle case where no tools are provided
+    # Generate list of tool descriptions
+    tools_text_list = [f"- {tool.name}: {tool.description}" for tool in tools]
+    # Join the list into a single multi-line string
+    tools_list = "\n".join(tools_text_list)
 
-openbridge_example = """
-    4. **Register and use the web components:** For example, in plain HTML:
+    # Define the complex example block separately to avoid f-string parsing issues
+    # Note: Use single braces {} inside this block as it's not an f-string itself
+    openbridge_example = """
+    4. **Register and use the web components:**
+
+       **Example 1: General Component Usage**
        ```html
        <!-- index.html -->
        <html lang="en" data-obc-theme="day">
@@ -16,78 +23,46 @@ openbridge_example = """
          </head>
          <body class="obc-component-size-regular">
            <!-- Default Top Bar included automatically -->
-           <!-- Attributes MUST be lowercase: showclock, showdimmingbutton, showappsbutton, apptitle, pagename -->
            <obc-top-bar id="topBar" apptitle="App Name" pagename="Page Name" showclock showdimmingbutton showappsbutton>
-             <!-- Alert button MUST be placed in the alerts slot by default -->
              <obc-alert-button slot="alerts" alerttype="warning" flatwhenidle nalerts="0" standalone style="max-width: 48px;"></obc-alert-button>
            </obc-top-bar>
-
-           <!-- Brilliance Menu (initially hidden) MUST be included by default -->
            <obc-brilliance-menu id="brillianceMenu" style="position: absolute; top: 50px; right: 10px; z-index: 10; display: none;"></obc-brilliance-menu>
-
            <main>
-             <!-- User requested components go here -->
              <obc-azimuth-thruster id="azimuthThruster" style="width: 300px; height: 300px;"></obc-azimuth-thruster>
              <obc-compass id="mainCompass" style="width: 300px; height: 300px;"></obc-compass>
            </main>
-
            <script type="module">
-             // Import base CSS variables
              import "@oicl/openbridge-webcomponents/src/palettes/variables.css";
-
-             // Import necessary component JS files for default setup + example
              // Base components
              import "@oicl/openbridge-webcomponents/dist/components/top-bar/top-bar.js";
              import "@oicl/openbridge-webcomponents/dist/components/icon-button/icon-button.js";
              import "@oicl/openbridge-webcomponents/dist/components/clock/clock.js";
              import "@oicl/openbridge-webcomponents/dist/components/alert-button/alert-button.js";
              import "@oicl/openbridge-webcomponents/dist/components/brilliance-menu/brilliance-menu.js";
-             // Icons for default top bar buttons (MUST be imported)
+             // Icons for default top bar buttons
              import "@oicl/openbridge-webcomponents/dist/icons/icon-menu-iec.js";
              import "@oicl/openbridge-webcomponents/dist/icons/icon-palette-day-night-iec.js";
              import "@oicl/openbridge-webcomponents/dist/icons/icon-applications.js";
-             // ** DO NOT import icon-alert-bell-indicator-iec.js - IT WILL CAUSE ERRORS **
+             // ** DO NOT import icon-alert-bell-indicator-iec.js **
              // User requested components in example
              import "@oicl/openbridge-webcomponents/dist/navigation-instruments/azimuth-thruster/azimuth-thruster.js";
              import "@oicl/openbridge-webcomponents/dist/navigation-instruments/compass/compass.js";
 
-             // --- Event Listeners & Logic ---
+             // --- Event Listeners & Logic (Standard Top Bar) ---
              const topBar = document.getElementById('topBar');
              const brillianceMenu = document.getElementById('brillianceMenu');
              const html = document.documentElement;
-
              if (topBar && brillianceMenu) {
-               // Dimming button toggles brilliance menu
-               topBar.addEventListener('dimming-button-clicked', () => {
-                 console.log('Dimming button clicked!');
-                 const isHidden = brillianceMenu.style.display === 'none';
-                 brillianceMenu.style.display = isHidden ? 'block' : 'none';
-               });
-
-               // Brilliance menu changes theme
-               brillianceMenu.addEventListener('palette-changed', (event) => { // <-- Changed event name here
-                 console.log('Palette changed:', event.detail.value);
-                 html.setAttribute('data-obc-theme', event.detail.value);
-                 brillianceMenu.style.display = 'none'; // Hide menu after selection
-               });
-
-               // Other top bar buttons
-               topBar.addEventListener('menu-button-clicked', () => {
-                 console.log('Menu button clicked!');
-                 // Add logic to show/hide sidebar menu
-               });
-               topBar.addEventListener('apps-button-clicked', () => {
-                 console.log('Apps button clicked!');
-                 // Add logic to show/hide apps menu
-               });
+               topBar.addEventListener('dimming-button-clicked', () => { brillianceMenu.style.display = brillianceMenu.style.display === 'none' ? 'block' : 'none'; });
+               brillianceMenu.addEventListener('palette-changed', (event) => { html.setAttribute('data-obc-theme', event.detail.value); brillianceMenu.style.display = 'none'; });
+               topBar.addEventListener('menu-button-clicked', () => console.log('Menu clicked'));
+               topBar.addEventListener('apps-button-clicked', () => console.log('Apps clicked'));
              }
 
-             // --- Animation Logic (Should be included by default for demos) ---
+             // --- Animation Logic (Example for General Components) ---
              const azimuthThruster = document.getElementById('azimuthThruster');
              if (azimuthThruster) {
-               let angle = 0;
-               let thrust = 0;
-               let thrustDir = 1;
+               let angle = 0, thrust = 0, thrustDir = 1;
                setInterval(() => {
                  angle = (angle + 1) % 360;
                  thrust += thrustDir * 2;
@@ -96,15 +71,207 @@ openbridge_example = """
                  azimuthThruster.thrust = thrust;
                }, 50);
              }
-
              const compass = document.getElementById('mainCompass');
              if (compass) {
                let heading = 0;
                setInterval(() => {
                  heading = (heading + 1.5) % 360;
-                 compass.heading = heading; // Use 'heading' attribute for compass
+                 compass.heading = heading;
                }, 75);
              }
+           </script>
+         </body>
+       </html>
+       ```
+       ```css
+       /* src/index.css - Example global styles for General Example */
+       @font-face { font-family: "Noto Sans"; src: url("/fonts/NotoSans-VariableFont_wdth,wght.ttf"); }
+       * { font-family: "Noto Sans", sans-serif; box-sizing: border-box; }
+       body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; background-color: var(--container-background-color); position: relative; }
+       /* Let main fill the width below the top bar. Handle content layout (flex, grid, etc.) *inside* main if needed. */
+       main { flex-grow: 1; padding: 1rem; /* Avoid centering main itself if top-bar is full width */ }
+       #brillianceMenu { position: absolute; top: 50px; right: 10px; z-index: 10; display: none; }
+       ```
+
+       **Example 2: Automation Diagram**
+       ```html
+       <!-- index-automation.html (Example filename) -->
+       <html lang="en" data-obc-theme="day">
+         <head>
+           <meta charset="UTF-8" />
+           <title>OpenBridge Automation Diagram</title>
+           <link rel="stylesheet" href="/src/index-automation.css"> <!-- Separate CSS for diagram layout -->
+         </head>
+         <body class="obc-component-size-regular">
+           <!-- Top Bar can be omitted if only showing the diagram -->
+
+           <main>
+             <!-- Diagram Container -->
+             <div class="container">
+               <!-- From tank 1 to pump -->
+               <obc-vertical-line id="line-t1-p-v" length="2.5" style="top: calc(24px * 9); left: calc(24px * 6)"></obc-vertical-line>
+               <obc-corner-line id="line-t1-p-c" direction="top-right" style="top: calc(24px * 12); left: calc(24px * 6)"></obc-corner-line>
+               <obc-horizontal-line id="line-t1-p-h" length="2.5" style="top: calc(24px * 12); left: calc(24px * 6.5)"></obc-horizontal-line>
+
+               <!-- Tank 1 -->
+               <obc-automation-tank id="tank1" max="5000" style="top: 72px; left: calc(24px * 6)"></obc-automation-tank>
+
+               <!-- From pump to three-way valve -->
+               <obc-horizontal-line id="line-p-v3-h" length="6" style="top: calc(24px * 12); left: calc(24px * 8)"></obc-horizontal-line>
+
+               <!-- Pump -->
+               <obc-automation-button id="pump" variant="double" style="top: calc(24px * 12); left: calc(24px * 8)">
+                 <obi-icon-pump-on-horizontal slot="icon" usecsscolor></obi-icon-pump-on-horizontal> <!-- Corrected tag -->
+               </obc-automation-button>
+
+               <!-- From three-way valve to tank 2 -->
+               <obc-horizontal-line id="line-v3-t2-h" length="2.5" style="top: calc(24px * 12); left: calc(24px * 16)"></obc-horizontal-line>
+               <obc-corner-line id="line-v3-t2-c" direction="bottom-left" style="top: calc(24px * 12); left: calc(24px * 19)"></obc-corner-line>
+               <obc-vertical-line id="line-v3-t2-v" length="1.5" style="top: calc(24px * 12.5); left: calc(24px * 19)"></obc-vertical-line>
+
+               <!-- From three-way valve to tank 3 -->
+               <obc-vertical-line id="line-v3-t3-v1" length="2.5" style="top: calc(24px * 9.5); left: calc(24px * 15)"></obc-vertical-line>
+               <obc-corner-line id="line-v3-t3-c1" direction="bottom-right" style="top: calc(24px * 9); left: calc(24px * 15)"></obc-corner-line>
+               <obc-horizontal-line id="line-v3-t3-h" length="15" style="top: calc(24px * 9); left: calc(24px * 15.5)"></obc-horizontal-line>
+               <obc-corner-line id="line-v3-t3-c2" direction="bottom-left" style="top: calc(24px * 9); left: calc(24px * 31)"></obc-corner-line>
+               <obc-vertical-line id="line-v3-t3-v2" length="5" style="top: calc(24px * 9.5); left: calc(24px * 31)"></obc-vertical-line>
+
+               <!-- Three-way valve -->
+               <obc-automation-button id="valve" style="top: calc(24px * 12); left: calc(24px * 15)">
+                  <obc-valve-analog-three-way-icon id="valveIcon" slot="icon"></obc-valve-analog-three-way-icon>
+               </obc-automation-button>
+
+               <!-- Tank 2 -->
+               <obc-automation-tank id="tank2" tag="#002" max="2000" style="top: calc(24px * 14); left: calc(24px * 19)"></obc-automation-tank>
+               <!-- Tank 3 -->
+               <obc-automation-tank id="tank3" tag="#003" max="10000" style="top: calc(24px * 14); left: calc(24px * 31)"></obc-automation-tank>
+             </div>
+           </main>
+
+           <script type="module">
+             // Import base CSS variables
+             import "@oicl/openbridge-webcomponents/src/palettes/variables.css";
+
+             // --- Import Base Components (Top Bar, etc.) ---
+             import "@oicl/openbridge-webcomponents/dist/components/top-bar/top-bar.js";
+             import "@oicl/openbridge-webcomponents/dist/components/icon-button/icon-button.js";
+             import "@oicl/openbridge-webcomponents/dist/components/clock/clock.js";
+             import "@oicl/openbridge-webcomponents/dist/components/alert-button/alert-button.js";
+             import "@oicl/openbridge-webcomponents/dist/components/brilliance-menu/brilliance-menu.js";
+             // Icons for default top bar buttons
+             import "@oicl/openbridge-webcomponents/dist/icons/icon-menu-iec.js";
+             import "@oicl/openbridge-webcomponents/dist/icons/icon-palette-day-night-iec.js";
+             import "@oicl/openbridge-webcomponents/dist/icons/icon-applications.js";
+             // ** DO NOT import icon-alert-bell-indicator-iec.js **
+
+             // --- Import Automation Diagram Components ---
+             import "@oicl/openbridge-webcomponents/dist/automation/automation-tank/automation-tank.js";
+             import "@oicl/openbridge-webcomponents/dist/automation/vertical-line/vertical-line.js";
+             import "@oicl/openbridge-webcomponents/dist/automation/horizontal-line/horizontal-line.js";
+             import "@oicl/openbridge-webcomponents/dist/automation/corner-line/corner-line.js";
+             import "@oicl/openbridge-webcomponents/dist/automation/automation-button/automation-button.js";
+             import "@oicl/openbridge-webcomponents/dist/automation/valve-analog-three-way-icon/valve-analog-three-way-icon.js";
+             import "@oicl/openbridge-webcomponents/dist/icons/icon-pump-on-horizontal.js"; // Corrected path
+
+             // --- Enums (Define or import if available) ---
+             const LineMedium = { water: 'water', empty: 'empty' };
+             const LineType = { fluid: 'fluid' };
+             const TankTrend = { stable: 0, falling: -1, fastFalling: -2, rising: 1, fastRising: 2 };
+             const AutomationButtonVariant = { default: 'default', double: 'double' };
+
+             // --- State Variables ---
+             const fillMedium = LineMedium.water;
+             const emptyMedium = LineMedium.empty;
+             const lineType = LineType.fluid;
+             const tank1Max = 5000, tank2Max = 2000, tank3Max = 10000;
+             let tank1Value = 1000, tank2Value = 300, tank3Value = 1000;
+             let pumpSpeed = 20, valve1Value = 30, valve2Value = 100;
+
+             // --- DOM Element References ---
+             const tank1El = document.getElementById('tank1');
+             const tank2El = document.getElementById('tank2');
+             const tank3El = document.getElementById('tank3');
+             const valveIconEl = document.getElementById('valveIcon');
+             const pumpEl = document.getElementById('pump');
+             const lineT1PV = document.getElementById('line-t1-p-v'), lineT1PC = document.getElementById('line-t1-p-c'), lineT1PH = document.getElementById('line-t1-p-h');
+             const linePV3H = document.getElementById('line-p-v3-h');
+             const lineV3T2H = document.getElementById('line-v3-t2-h'), lineV3T2C = document.getElementById('line-v3-t2-c'), lineV3T2V = document.getElementById('line-v3-t2-v');
+             const lineV3T3V1 = document.getElementById('line-v3-t3-v1'), lineV3T3C1 = document.getElementById('line-v3-t3-c1'), lineV3T3H = document.getElementById('line-v3-t3-h'), lineV3T3C2 = document.getElementById('line-v3-t3-c2'), lineV3T3V2 = document.getElementById('line-v3-t3-v2');
+
+             // --- Helper Functions ---
+             function calculateTankTrend(flow) {
+               if (flow > 10) return TankTrend.fastFalling;
+               if (flow > 1) return TankTrend.falling;
+               if (flow > -1) return TankTrend.stable;
+               if (flow > -10) return TankTrend.rising;
+               return TankTrend.fastRising;
+             }
+             function updateTank1() {
+               const tank1Out = pumpSpeed;
+               tank1El.value = tank1Value;
+               tank1El.medium = fillMedium;
+               tank1El.trend = calculateTankTrend(tank1Out);
+               const t1Medium = tank1Value > 0 && pumpSpeed > 0 ? fillMedium : emptyMedium;
+               lineT1PV.medium = t1Medium; lineT1PC.medium = t1Medium; lineT1PH.medium = t1Medium; linePV3H.medium = t1Medium;
+             }
+             function updateTank2() {
+               const tank2In = (pumpSpeed * valve1Value) / (valve1Value + valve2Value || 1);
+               tank2El.value = tank2Value;
+               tank2El.medium = fillMedium;
+               tank2El.trend = calculateTankTrend(-tank2In);
+               const t2Medium = tank2In > 0 ? fillMedium : emptyMedium;
+               lineV3T2H.medium = t2Medium; lineV3T2C.medium = t2Medium; lineV3T2V.medium = t2Medium;
+             }
+             function updateTank3() {
+               const tank3In = (pumpSpeed * valve2Value) / (valve1Value + valve2Value || 1);
+               tank3El.value = tank3Value;
+               tank3El.medium = fillMedium;
+               tank3El.trend = calculateTankTrend(-tank3In);
+               const t3Medium = tank3In > 0 ? fillMedium : emptyMedium;
+               lineV3T3V1.medium = t3Medium; lineV3T3C1.medium = t3Medium; lineV3T3H.medium = t3Medium; lineV3T3C2.medium = t3Medium; lineV3T3V2.medium = t3Medium;
+             }
+             function updateValve() { if (valveIconEl) { valveIconEl.value = valve1Value; valveIconEl.value2 = valve2Value; } }
+             function updatePump() { /* Update pump visual state if needed */ }
+             function initializeDiagram() {
+                 [lineT1PV, lineT1PC, lineT1PH, linePV3H, lineV3T2H, lineV3T2C, lineV3T2V, lineV3T3V1, lineV3T3C1, lineV3T3H, lineV3T3C2, lineV3T3V2].forEach(el => { if (el) el.type = lineType; });
+                 if (tank1El) tank1El.max = tank1Max; if (tank2El) tank2El.max = tank2Max; if (tank3El) tank3El.max = tank3Max;
+                 if (pumpEl) pumpEl.variant = AutomationButtonVariant.double;
+                 updateTank1(); updateTank2(); updateTank3(); updateValve(); updatePump();
+             }
+             function runSimulation() {
+               if (tank1Value <= 1) { tank1Value = 0; pumpSpeed = 0; }
+               const tank1Out = pumpSpeed; const tank2In = (pumpSpeed * valve1Value) / (valve1Value + valve2Value || 1); const tank3In = (pumpSpeed * valve2Value) / (valve1Value + valve2Value || 1);
+               tank1Value -= tank1Out / 1; tank2Value += tank2In / 1; tank3Value += tank3In / 1;
+               tank1Value = Math.max(0, tank1Value); tank2Value = Math.min(tank2Max, Math.max(0, tank2Value)); tank3Value = Math.min(tank3Max, Math.max(0, tank3Value));
+               updateTank1(); updateTank2(); updateTank3(); updateValve(); updatePump();
+             }
+
+             // --- Top Bar Logic (Standard) ---
+             const topBar = document.getElementById('topBar');
+             const brillianceMenu = document.getElementById('brillianceMenu');
+             const html = document.documentElement;
+             if (topBar && brillianceMenu) {
+               topBar.addEventListener('dimming-button-clicked', () => { brillianceMenu.style.display = brillianceMenu.style.display === 'none' ? 'block' : 'none'; });
+               brillianceMenu.addEventListener('palette-changed', (event) => { html.setAttribute('data-obc-theme', event.detail.value); brillianceMenu.style.display = 'none'; });
+               topBar.addEventListener('menu-button-clicked', () => console.log('Menu clicked'));
+               topBar.addEventListener('apps-button-clicked', () => console.log('Apps clicked'));
+             }
+
+             // --- Start Simulation ---
+             // Use customElements.whenDefined for robustness
+             Promise.all([
+               customElements.whenDefined('obc-automation-tank'),
+               customElements.whenDefined('obc-vertical-line'),
+               customElements.whenDefined('obc-horizontal-line'),
+               customElements.whenDefined('obc-corner-line'),
+               customElements.whenDefined('obc-automation-button'),
+               customElements.whenDefined('obc-valve-analog-three-way-icon'),
+               customElements.whenDefined('obi-icon-pump-on-horizontal') // Corrected tag name
+             ]).then(() => {
+               initializeDiagram();
+               setInterval(runSimulation, 1000);
+             }).catch(error => console.error("Error waiting for components:", error));
+
            </script>
          </body>
        </html>
@@ -127,16 +294,13 @@ openbridge_example = """
          display: flex;
          flex-direction: column;
          background-color: var(--container-background-color); /* Use theme variables */
-         position: relative; /* Needed for absolute positioning of brilliance menu */
+         position: relative; /* Needed for absolute positioning */
        }
 
        main {
          flex-grow: 1;
-         padding: 1rem; /* Example padding */
-         display: flex; /* Example layout */
-         gap: 1rem;
-         justify-content: center;
-         align-items: center;
+         padding: 1rem;
+         /* Remove flex layout if container handles positioning */
        }
 
        /* Basic styling for brilliance menu positioning */
@@ -147,18 +311,31 @@ openbridge_example = """
          z-index: 10;
          display: none; /* Initially hidden - controlled by JS */
        }
+
+       /* Diagram Layout Styles */
+       .container {
+         width: 1000px; /* Example fixed width */
+         height: 1000px; /* Example fixed height */
+         position: relative; /* Crucial for absolute positioning of diagram elements */
+         /* Avoid margin: auto here if the top-bar is full width, as it will cause misalignment. */
+         /* Position the container itself if needed, e.g., using grid/flex on the parent (main) */
+         margin: 2rem 0; /* Example top/bottom margin only */
+         border: 1px solid #ccc; /* Optional: visualize container */
+       }
+
+       .container > * {
+         position: absolute; /* All direct children are positioned absolutely */
+       }
        ```
     5. **Component-Specific Styling:** Individual components have their own CSS files (e.g., `button.css`, etc.) in the `@oicl/openbridge-webcomponents/src/` directory. These are typically bundled, but can be referenced for deeper customization.
+
+    6. **Automation Diagram Specifics:**
+       - **Layout:** Use CSS `position: absolute;` and `top`/`left` with `calc(var(--grid-unit, 24px) * N)` for precise placement of automation components (tanks, lines, valves, pumps) within a relatively positioned container (`.container` in the example).
+       - **Alignment:** Ensure the main content area (`<main>` or specific containers like `.container`) is styled such that its width aligns with the `<obc-top-bar>`. Avoid centering the main content container with `margin: auto` if the top bar spans the full viewport width, as this will cause visual misalignment. Structure the page so both elements respect the same width constraints.
+       - **Component Imports:** Ensure you import the specific `.js` files for all used automation components (e.g., `automation-tank.js`, `vertical-line.js`, `valve-analog-three-way-icon.js`, etc.) and any icons (e.g., `obi-08-pump-on-horisontal.js`).
+       - **Properties:** Set component properties directly via JavaScript (e.g., `tankElement.value = 50; tankElement.medium = 'water';`) or HTML attributes where applicable (e.g., `<obc-vertical-line length="5">`). Remember attribute names are lowercase.
+       - **Logic:** Implement dynamic behavior (like tank filling/emptying, line medium changes) using plain JavaScript, updating component properties based on simulation state.
 """
-
-def get_prompt(cwd: str, openbridge_example: str = openbridge_example, tools: list = []) -> str:
-    # Generate list of tool descriptions
-    tools_text_list = [f"- {tool.name}: {tool.description}" for tool in tools]
-    # Join the list into a single multi-line string
-    tools_list = "\n".join(tools_text_list)
-
-    # Define the complex example block separately to avoid f-string parsing issues
-    # Note: Use single braces {} inside this block as it's not an f-string itself
 
     # Main f-string for the prompt
     return f"""
@@ -348,7 +525,29 @@ You are Bolt, an expert AI assistant and exceptional senior software developer w
   </modifications>
 </diff_spec>
 
+<reasoning_and_planning_guidelines>
+  **CRITICAL: Before generating any code artifact, you MUST perform a detailed reasoning and planning step.** This involves:
+
+  1.  **Analyze Inputs Thoroughly:**
+      - **Visuals (Image/Figma):** Carefully examine any provided images or Figma links. Identify all visual elements (components, layout, text, colors, icons). Prioritize matching the visual representation. Extract layout details (positioning, spacing, dimensions).
+      - **Code:** Review any existing code snippets or files provided. Understand their structure and functionality. Note any relevant variables, functions, or components already in use.
+      - **Text Description:** Parse the user's request and any accompanying text for specific requirements, constraints, or desired functionality.
+  2.  **Synthesize Requirements:** Combine insights from all inputs into a clear set of requirements. If there are conflicts (e.g., text description differs from image), prioritize the visual source (Image > Figma > Text) unless the user explicitly states otherwise.
+  3.  **Identify Components:** List the specific OpenBridge web components needed to fulfill the requirements (e.g., `<obc-tank>`, `<obc-vertical-line>`, `<obi-08-pump-on-horisontal>`, `<obc-button>`). Check if all required components are available in the library based on the provided documentation or examples. Note any potential custom elements or complex interactions needed.
+  4.  **Plan Implementation:**
+      - **HTML Structure:** Outline the necessary HTML elements and their hierarchy. Define IDs for elements that need to be accessed via JavaScript.
+      - **CSS Strategy:** Plan the CSS approach. For diagrams or precise layouts, detail the use of `position: absolute;` within a `position: relative;` container, using `calc()` with CSS variables or fixed units for `top`, `left`, `width`, `height`. Specify necessary global styles vs. component-specific styles.
+      - **JavaScript Logic:** Describe the required JavaScript functionality. Identify variables needed, event listeners to attach, functions to create (e.g., for simulation, updates, calculations), and how component properties will be dynamically updated. List all necessary component `.js` module imports.
+  5.  **Pre-computation:** Perform any necessary calculations (e.g., converting grid units to pixels, determining coordinates) based on the analysis *before* writing the code.
+
+  **Output the Plan:** Briefly summarize this plan *before* generating the `<boltArtifact>`. This shows the user your understanding and allows for correction before code generation.
+
+  **IMPORTANT:** After completing the reasoning and planning phase, you MUST then meticulously follow all subsequent instructions regarding setup (fonts, CSS variables, etc.) and artifact generation rules (dependency installation order, file structure, `npm run dev` placement, etc.) when creating the `<boltArtifact>`. The plan informs the artifact content, but does not replace the strict execution rules.
+</reasoning_and_planning_guidelines>
+
 <artifact_info>
+  **CRITICAL:** The following instructions define HOW to structure the final output artifact AFTER the reasoning and planning phase is complete. Adhere to these rules strictly.
+
   Bolt creates a SINGLE, comprehensive artifact for each project. The artifact contains all necessary steps and components, including:
 
   - Shell commands to run including dependencies to install using a package manager (NPM)

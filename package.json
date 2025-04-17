@@ -48,9 +48,9 @@
     "@oicl/openbridge-webcomponents-react": "^0.0.17",
     "@radix-ui/react-dialog": "^1.1.1",
     "@radix-ui/react-dropdown-menu": "^2.1.1",
-    "@remix-run/cloudflare": "^2.10.2",
-    "@remix-run/cloudflare-pages": "^2.10.2",
-    "@remix-run/react": "^2.10.2",
+    "@remix-run/cloudflare": "^2.16.5",
+    "@remix-run/cloudflare-pages": "^2.16.5",
+    "@remix-run/react": "^2.16.5",
     "@remix-run/server-runtime": "^2.16.5",
     "@uiw/codemirror-theme-vscode": "^4.23.0",
     "@unocss/reset": "^0.61.0",
@@ -86,7 +86,7 @@
   "devDependencies": {
     "@blitz/eslint-plugin": "0.1.0",
     "@cloudflare/workers-types": "^4.20240620.0",
-    "@remix-run/dev": "^2.10.0",
+    "@remix-run/dev": "^2.16.5",
     "@types/diff": "^5.2.1",
     "@types/react": "^18.2.20",
     "@types/react-dom": "^18.2.7",
@@ -99,7 +99,7 @@
     "typescript": "^5.5.2",
     "unified": "^11.0.5",
     "unocss": "^0.61.3",
-    "vite": "^5.3.1",
+    "vite": "^6.3.0",
     "vite-plugin-node-polyfills": "^0.22.0",
     "vite-plugin-optimize-css-modules": "^1.1.0",
     "vite-tsconfig-paths": "^4.3.2",
@@ -109,5 +109,15 @@
   },
   "resolutions": {
     "@typescript-eslint/utils": "^8.0.0-alpha.30"
+  },
+  "pnpm": {
+    "overrides": {
+      "code": "npm:@hapi/code@^9.0.3",
+      "nanoid": "^3.3.8",
+      "cross-spawn": ">=7.0.5",
+      "svelte": "4.2.19",
+      "undici": ">=6.21.1",
+      "cookie": ">=0.7.0"
+    }
   }
 }
