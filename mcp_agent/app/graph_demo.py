@@ -249,7 +249,7 @@ async def get_replan_step():
         
         replanner_message = replanner_prompt.format_messages(
             input=input_content,
-            design_template=state.design_template,
+            design_template=get_design_template(openbridge_example),
             original_plan=original_plan,
             past_steps=past_steps_formatted
         )
