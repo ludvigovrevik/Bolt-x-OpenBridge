@@ -10,7 +10,7 @@ import operator
 # Removed logging import
 from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, Field
-from .prompt import get_prompt
+from .prompt import get_prompt, openbridge_example
 
 class AgentState(BaseModel):
     """State of the agent."""
@@ -31,6 +31,7 @@ def create_agent_graph(tools, checkpointer=None):
         system_message = SystemMessage(content=get_prompt(
             cwd=state.cwd,
             tools=tools,
+            openbridge_example=openbridge_example,
             ))
         inputs = [system_message] + state.messages
         # Removed logging

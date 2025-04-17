@@ -327,7 +327,10 @@ openbridge_example = """
        - **Logic:** Implement dynamic behavior (like tank filling/emptying, line medium changes) using plain JavaScript, updating component properties based on simulation state.
 """ 
 
-def get_prompt(cwd: str = '.', tools: list = []) -> str:
+def get_prompt(cwd: str = '.', 
+               tools: list = [],
+               openbridge_example: str = openbridge_example,
+               ) -> str:
     tools_text_list = [f"- {tool.name}: {tool.description}" for tool in tools]
     # Join the list into a single multi-line string
     tools_list = "\n".join(tools_text_list)
