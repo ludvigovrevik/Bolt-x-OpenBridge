@@ -131,7 +131,7 @@ async def get_plan_step():
         input = state.input[-1].content
         planner_prompt = ChatPromptTemplate.from_messages([
             ("system", """You are an expert app designer and architect. 
-    For the given objective and design template, create a detailed step-by-step plan with NO MORE THAN 8 STEPS for developing the app..
+    For the given objective and design template, create a detailed step-by-step plan with NO MORE THAN 3 STEPS for developing the app..
     Break down the app development into logical components and files to be created.
     Each step should be specific and actionable, focusing on one file or component at a time.
     The plan should be comprehensive and cover all aspects of the app.
@@ -161,7 +161,7 @@ async def get_plan_step():
 async def get_execution_agent(tools: List[Any]):
     async def execute_step(state: AgentState) -> dict:
         app_plan = state.app_plan
-        design_template = state.design_template
+        design_template = get_design_template(openbridge_example)
         cwd = state.cwd
         model_name = state.model_name
         test_mode = state.test
@@ -176,13 +176,9 @@ async def get_execution_agent(tools: List[Any]):
         print(f"EXECUTE: Processing step: {current_step}")
         print(f"EXECUTE: Remaining steps: {len(remaining_steps)}")
         
-        # Create execution agent with current model
-        if test_mode:
-            execution_prompt = get_mock_prompt(cwd, design_template)
-        else:
-            execution_prompt = get_prompt(cwd)
-            print("EXECUTE: Invoking prompt for llm agent")
-        
+        execution_prompt = get_prompt(cwd)
+        print("EXECUTE: Invoking prompt for llm agent")
+    
         model = await get_model(
             model_name=model_name,
             test=test_mode,
