@@ -32,13 +32,12 @@ from langgraph.prebuilt import create_react_agent
 from langchain_mcp_tools import convert_mcp_to_langchain_tools
 from langgraph.checkpoint.memory import MemorySaver
 import json
-import json # Add json import
-from contextlib import asynccontextmanager
-from json import JSONEncoder
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.prompts import ChatPromptTemplate
 from .prompts.artifact_prompt import get_prompt
 from .load_model import load_model
-from .graph import create_agent_graph, AgentState
+#from .graph import create_agent_graph, AgentState
+from .graph_demo import create_agent_graph, AgentState
+from .prompt import openbridge_example
 #from .prompt import get_prompt
 import logging # Add logging import
 
@@ -51,6 +50,37 @@ logger = logging.getLogger(__name__)
 class ConfigLLM(BaseModel):
     model_name: str = os.getenv("LLM_MODEL_NAME", "gpt-4.1")
     temperature: float = 0.0
+
+def get_design_template(openbridge_example):
+    return """
+        Project Structure:
+        - src/
+        - components/
+            - Each component should have its own folder
+            - Each folder should contain index.js and styles.css
+        - utils/
+        - pages/
+        - App.js
+        - index.js
+        
+        Styling:
+        - Use CSS modules
+        - Follow BEM naming convention
+        - Use a color scheme of #f5f5f5, #4a90e2, #50e3c2
+        
+        Component Structure:
+        - Functional components with hooks
+        - Props should be destructured
+        - Each component should have propTypes
+        
+        State Management:
+        - Use React Context API for global state
+        - Use useReducer for complex state logic
+
+        Example of what we want:
+        {openbridge_example}
+
+        """.format(openbridge_example=openbridge_example)
 
 # Update the MCPAgent class with these key changes
 class MCPAgent:
@@ -102,7 +132,7 @@ class MCPAgent:
         self.tools, self.cleanup_func = await convert_mcp_to_langchain_tools(self.mcp_servers)
         # Remove the nested initialize function and create the graph directly
         if self.tools:
-            self.graph = create_agent_graph(
+            self.graph = await create_agent_graph(
                 self.tools,
                 self.checkpointer
             )
@@ -123,10 +153,8 @@ class MCPAgent:
         initial_state = AgentState(
             cwd=os.getcwd(),
             model_name=self.llm.model_name,
-            messages=input,
-            agent_outcome=None,
-            return_direct=False,
-            intermediate_steps=[]
+            input=input,
+            design_template=get_design_template(openbridge_example),
         )
 
         # Use proper input format for the graph
@@ -228,7 +256,7 @@ async def chat_endpoint(request: ChatRequest):
                 # Removed incorrect stream_mode argument here
             ):
                 event_name = event.get("event")
-                logger.info(f"--- Agent Event Received: {event_name} ---") # Log inside loop
+                #logger.info(f"--- Agent Event Received: {event_name} ---") # Log inside loop
 
                 # Focus ONLY on the event carrying content chunks from the LLM stream
                 if event_name == "on_chat_model_stream":

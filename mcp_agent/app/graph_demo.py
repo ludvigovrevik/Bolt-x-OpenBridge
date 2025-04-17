@@ -1,199 +1,448 @@
 # graph.py
-from typing import TypedDict, Annotated, Union, Sequence, Optional, Dict, List, Any
-from langchain_core.agents import AgentAction, AgentFinish
-from langchain_core.messages import BaseMessage, ToolMessage, AIMessage, SystemMessage
-from langchain_core.runnables import RunnableConfig
-from langgraph.graph import StateGraph, END
+from typing import TypedDict, Annotated, Union, Sequence, Optional, Dict, List, Tuple, Any
+from langgraph.graph import StateGraph, END, START
 from .load_model import load_model
-import json
 import operator
-from langgraph.prebuilt import ToolNode
+from langchain_core.language_models.chat_models import BaseChatModel
 from pydantic import BaseModel, Field
-from .prompts.designer_prompt import get_designer_prompt, DesignSpecification
 from .load_model import load_model
-from .prompts.artifact_prompt import get_prompt
+from .prompt import get_prompt
+from langgraph.prebuilt import create_react_agent
+import os
+from langchain_core.messages import BaseMessage, HumanMessage
+from langchain import hub
+from langchain_core.prompts import ChatPromptTemplate
 
 
-class FileSpecification(BaseModel):
-    path: str
-    purpose: str
-    dependencies: List[str] = Field(default_factory=list)
-
-# Define the structure we want for each file
-class ListFileSpecification(BaseModel):
-    file: List[FileSpecification] = Field(..., description="List of file specifications")
-
+# Define the state as a Pydantic model for dot walking
 class AgentState(BaseModel):
-    """State of the agent."""
+    input: Annotated[List[BaseMessage], operator.add]  # User's input
+    design_template: str  # User's design template
+    app_plan: List[str] = []  # Detailed app development plan
+    past_steps: Annotated[List[Tuple[str, str]], operator.add] = []  # Previously executed steps (step, result)
+    files_created: Annotated[Dict[str, str], operator.or_] = {}  # Files created so far (filepath, content)
+    response: Optional[str] = None  # Final response to user
+    model_name: str = "gpt-4.1"
     cwd: str = Field(default=".", description="Current working directory")
-    messages: Annotated[Sequence[BaseMessage], operator.add]
-    human_input: Optional[list[BaseMessage]] = None
-    agent_outcome: Union[AgentAction, AgentFinish, None] = None
-    return_direct: bool = False
-    intermediate_steps: Annotated[list[tuple[AgentAction, str]], operator.add]  = Field(default_factory=list)
-    model_name : str = "gpt-4.1"  # Default model name
-    """Extended state with design specifications"""
+    test: bool = False  # Test mode flag
 
-class EnhancedAgentState(AgentState):
-    """Extended state with design specifications"""
-    design_spec: Optional[DesignSpecification] = None
-    current_files: Dict[str, str] = Field(default_factory=dict)
-    implementation_plan: List[str] = Field(default_factory=list)
-    files_to_generate: ListFileSpecification = Field(default_factory=list)  # Will contain FileSpecification objects
-    pending_files: List[str] = Field(default_factory=list)
-    completed_files: List[str] = Field(default_factory=list)
-    current_file_focus: Optional[str] = None
-
-
-def create_agent_graph(tools=None, checkpointer=None):
-    workflow = StateGraph(EnhancedAgentState)
-
-    async def design_spec_generator(state: EnhancedAgentState, config: RunnableConfig):
-        # Generate structured design spec
-        human_input = state.messages[-1]
-        system_prompt = get_designer_prompt(
-            cwd=state.cwd,
-            file_list=list(state.current_files.keys()),
-            prev_spec={} if state.design_spec is None else state.design_spec.dict()
-        )
-
-        input = [
-            SystemMessage(content=system_prompt),
-        ] + state.messages
-
-        struct_llm = load_model(model_name=state.model_name, parser=DesignSpecification)
-        design_spec_cls = await struct_llm.ainvoke(input)
-
-        return {
-            "design_spec": design_spec_cls,
-            "human_input": [human_input],
-            }
-
-    async def implementation_planner(state: EnhancedAgentState, config: RunnableConfig):
-        """Generate list of files needed based on design spec"""
-        if not state.design_spec:
-            return {"messages": [AIMessage(content="Design specification missing. Please provide requirements first.")]}
-
-        system_prompt = """Based on the design specification, create a detailed list of files that need to be implemented.
-        For each file, provide:
-        1. File path/name
-        2. Purpose of the file
-        3. Dependencies and relationships with other files
-
-        Format your response as a list of objects, where each object has:
-        - path: the file path/name
-        - purpose: description of the file's purpose
-        - dependencies: list of other files it depends on
-
-        Be comprehensive and ensure all necessary files for the complete implementation are included.
-        """
-
-        input = [
-            SystemMessage(content=system_prompt),
-            SystemMessage(content=f"Design Specification: {state.design_spec.schema_json()}"),
-        ] + state.messages
-
-        # Generate file implementation plan with proper parsing
-        struct_llm = load_model(model_name=state.model_name, parser=ListFileSpecification)
-        files_specification = await struct_llm.ainvoke(input)
-
-        # Update state with files that need to be created
-        return {
-            "files_to_generate": files_specification.file,  # Store the list of files
-            "pending_files": [file.path for file in files_specification.file],  # Access the path attribute from each file spec
-            "messages": [AIMessage(content=f"Created implementation plan with {len(files_specification.file)} files to generate.")]
-        }
-
-    async def file_selector(state: EnhancedAgentState, config: RunnableConfig):
-        """Select next file to implement from pending files"""
-        if not state.pending_files:
-            return {"messages": [AIMessage(content="All files have been generated.")], "current_file_focus": None}
-
-        next_file = state.pending_files[0]
-        pending_files = state.pending_files[1:]  # Remove the selected file
-
-        file_details = next((file for file in state.files_to_generate if file.path == next_file), None)
-
-        return {
-            "current_file_focus": next_file,
-            "pending_files": pending_files,
-            "messages": [AIMessage(content=f"Working on file: {next_file}\nPurpose: {file_details.purpose if file_details else 'N/A'}")],
-        }
-
-
-    class  FileGeneratorState
-
-    async def file_generator(state: EnhancedAgentState, config: RunnableConfig):
-        """Generate content for the current focus file"""
-        if not state.current_file_focus:
-            return {"messages": [AIMessage(content="No file selected for generation.")]}
-
-        file_path = state.current_file_focus
-        file_details = next((file for file in state.files_to_generate if file.path == file_path), None)
-
-        # Convert Pydantic model to dict if it exists, otherwise use empty dict
-        file_details_dict = file_details.dict() if file_details else {}
-
-        system_prompt = get_prompt(
-            cwd=state.cwd,
-            tools=[],
-            file_details=file_details_dict,
-            design_specification=state.design_spec.model_dump() if state.design_spec else None,
-            )
-
-        input = [
-            SystemMessage(content=system_prompt),
-        ] + state.human_input
-
-        # Generate file content
-        implementation_llm = load_model(model_name=state.model_name)
-        file_content = await implementation_llm.ainvoke(input)
-
-        # Update current_files with the new implementation
-        current_files = state.current_files.copy()
-        current_files[file_path] = file_content
-
-        # Add to completed files
-        completed_files = state.completed_files.copy() if hasattr(state, 'completed_files') else []
-        completed_files.append(file_path)
-
-        return {
-            "current_files": current_files,
-            "completed_files": completed_files,
-            "messages": [file_content],
-        }
-
-    def should_continue_implementation(state: EnhancedAgentState):
-        """Determine if we need to continue generating files or end the graph"""
-        if state.pending_files:
-            return "continue"
-        else:
-            return "end"
-
-    # Add nodes to the workflow
-    workflow.add_node("design_spec_generator", design_spec_generator)
-    workflow.add_node("implementation_planner", implementation_planner)
-    workflow.add_node("file_selector", file_selector)
-    workflow.add_node("file_generator", file_generator)
-
-    # Define workflow logic
-    workflow.set_entry_point("design_spec_generator")
-    workflow.add_edge("design_spec_generator", "implementation_planner")
-
-    # Add conditional edge for file generation loop
-    workflow.add_edge("implementation_planner", "file_selector")
-
-    workflow.add_edge("file_selector", "file_generator")
-
-    # After generating a file, decide whether to continue or end
-    workflow.add_conditional_edges(
-        "file_generator",
-        should_continue_implementation,
-        {
-            "continue": "file_selector",  # Loop back to select next file
-            "end": END
-        }
+# Define Pydantic models for structured outputs
+class AppPlan(BaseModel):
+    """Detailed app development plan"""
+    steps: List[str] = Field(
+        description="Different steps to follow in order to develop the app"
     )
 
+class Response(BaseModel):
+    """Response to user"""
+    response: str
 
-    return workflow.compile(checkpointer=checkpointer)
+class Action(BaseModel):
+    """Action to perform"""
+    action: Union[Response, AppPlan] = Field(
+        description="Action to perform. Use Response to respond to user or AppPlan to create/update plan."
+    )
+
+# Mock LLM for testing
+class MockChatModel(BaseChatModel):
+    """Mock Chat Model for testing purposes"""
+    
+    def __init__(self):
+        super().__init__()
+   
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        """Synchronous generate method required by BaseChatModel"""
+        raise NotImplementedError("MockChatModel only supports async generation")
+    
+    async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
+        """Mock generation method that returns predetermined responses based on the prompt"""
+        from langchain_core.messages import AIMessage
+        from langchain_core.outputs import ChatGeneration, ChatResult
+        import json
+        
+        prompt = messages[0].content if messages else ""
+        
+        # Return different mock responses based on the content of the prompt
+        if "create a detailed step-by-step plan" in prompt.lower():
+            # Return a mock plan - use JSON string instead of dict
+            steps = [
+                "Create project structure",
+                "Set up React components",
+                "Implement state management",
+                "Add styling"
+            ]
+            # For structured output, use JSON string format
+            content = json.dumps({"steps": steps})
+            response = AIMessage(content=content)
+        elif "executing step" in prompt.lower():
+            # Mock file content generation
+            step = prompt.split("executing step:")[1].strip().split("\n")[0] if "executing step:" in prompt else "Unknown step"
+            
+            if "project structure" in step.lower():
+                content = "// Project structure setup\nconsole.log('Project structure created');"
+            elif "react components" in step.lower():
+                content = "import React from 'react';\n\nfunction Component() {\n  return <div>Mock Component</div>;\n}\n\nexport default Component;"
+            elif "state management" in step.lower():
+                content = "import { createContext, useReducer } from 'react';\n\nexport const AppContext = createContext();\n\nconst initialState = { tasks: [] };"
+            elif "styling" in step.lower():
+                content = ".component {\n  color: #4a90e2;\n  background-color: #f5f5f5;\n}"
+            else:
+                content = f"// Mock implementation for: {step}"
+                
+            response = AIMessage(content=content)
+        else:
+            # Default mock response
+            content = "Mock response for testing purposes."
+            response = AIMessage(content=content)
+        
+        generation = ChatGeneration(message=response)
+        return ChatResult(generations=[generation])
+    
+    @property
+    def _llm_type(self):
+        return "mock-chat-model"
+
+# Factory function to get the appropriate model
+async def get_model(tools: list = [], prompt: Any =None, parser: BaseModel = None, 
+                    model_name: str = None, 
+                    test: bool = False) -> BaseChatModel:
+    """
+    Get the appropriate model based on test flag and model name
+    """
+    if test:
+        return MockChatModel()
+    else:
+        return load_model(
+            model_name=model_name,
+            tools=tools,
+            prompt=prompt,
+            parser=parser
+            )
+
+# Mock implementation of get_prompt function
+def get_mock_prompt(cwd: str, design_template: str) -> str:
+    """
+    Get formatting instructions for the current working directory.
+    This function returns a system message with formatting instructions.
+    """
+    return f"""You are creating files in the directory: {cwd}
+
+FORMATTING INSTRUCTIONS:
+{design_template}
+
+Follow these instructions exactly when creating files. Do not add any filepath information or output modifications.
+Return only the content of the file as plain text.
+"""
+
+# Execute step function
+async def get_execution_agent(tools: List[Any]):
+    async def execute_step(state: AgentState) -> dict:
+        app_plan = state.app_plan
+        design_template = state.design_template
+        cwd = state.cwd
+        model_name = state.model_name
+        test_mode = state.test
+        
+        if not app_plan:
+            print("EXECUTE: No steps in plan to execute")
+            return {"past_steps": [("Error", "No steps in plan to execute")]}
+        
+        current_step = app_plan[0]
+        remaining_steps = app_plan[1:] if len(app_plan) > 1 else []
+        
+        print(f"EXECUTE: Processing step: {current_step}")
+        print(f"EXECUTE: Remaining steps: {len(remaining_steps)}")
+        
+        # Create execution agent with current model
+        if test_mode:
+            execution_prompt = get_mock_prompt(cwd, design_template)
+        else:
+            execution_prompt = get_prompt(cwd)
+            print("EXECUTE: Invoking prompt for llm agent")
+        
+        model = await get_model(
+            model_name=model_name,
+            test=test_mode,
+            parser=None
+        )
+        
+        executor_agent = create_react_agent(model, tools, prompt=execution_prompt)
+        
+        # Prepare context for the agent
+        task_formatted = f"""For the following app plan:
+        {app_plan}\n\n
+        You are tasked with executing step: {current_step}
+
+        Work in the current directory: {cwd}
+
+        Follow the design template: {design_template}
+        """
+            
+        agent_response = await executor_agent.ainvoke({"messages": [("user", task_formatted)]})
+        response_content = agent_response["messages"][-1].content
+        
+        step_name = current_step.lower().replace(" ", "_")
+        filename = f"{step_name}"
+        
+        print(f"EXECUTE: Completed step: {current_step}")
+        
+        return {
+            "past_steps": [(current_step, response_content)],
+            "files_created": {filename: response_content},
+            "app_plan": remaining_steps
+        }
+    
+    return execute_step
+
+# Create the planning agent with structured output
+
+DESIGNER_PROMPT = f"""
+You are Bolt-UI, an expert UI/UX designer and frontend architect specializing in OpenBridge design system.
+
+<design_requirements>
+1. Current Project State:
+   - CWD: {{cwd}}
+   - Existing Files: {{file_list}}
+   - Previous Specification: {{prev_spec}}
+
+2. Required Output:
+   - Full implementation-ready design specification
+   - Must include ALL fields from the format above
+   - Technical details must match WebContainer constraints
+   - Component versions must match OpenBridge requirements
+</design_requirements>
+
+<design_constraints>
+- Strictly use @oicl/openbridge-webcomponents@0.0.17+
+- ES modules only (no CommonJS)
+- Vite-based build system
+- Mobile-first responsive design
+- Performance budget: 100ms main thread work per interaction
+</design_constraints>
+
+<output_instructions>
+1. Generate complete specification using JSON format
+2. Validate against the provided schema
+3. Ensure technical feasibility in WebContainer
+4. Include implementation-ready configuration details
+5. Maintain consistency with previous spec iterations
+</output_instructions>
+"""
+
+# Plan step function
+async def get_plan_step():
+    async def plan_step(state: AgentState) -> dict:
+        input = state.input[-1].content
+        planner_prompt = ChatPromptTemplate.from_messages([
+            ("system", """You are an expert app designer and architect. 
+    For the given objective and design template, create a detailed step-by-step plan for developing the app.
+    Break down the app development into logical components and files to be created.
+    Each step should be specific and actionable, focusing on one file or component at a time.
+    The plan should be comprehensive and cover all aspects of the app.
+    Consider project structure, dependencies, components, styling, and functionality."""),
+            ("user", "Design Template: {design_template}\n\nObjective: {input}"),
+        ])
+
+        planner_message = planner_prompt.format_messages(
+            design_template=state.design_template,
+            input=input
+        )
+
+        planner = await get_model(
+            model_name=state.model_name, 
+            test=state.test,
+            parser=AppPlan
+            )
+            
+        
+        plan_result = await planner.ainvoke(planner_message)
+        return {"app_plan": plan_result.steps}
+    return plan_step
+
+# Replan step function
+async def get_replan_step():
+    async def replan_step(state: AgentState) -> dict:
+        # Safety mechanism to prevent infinite loops
+        if len(state.past_steps) > 20:  # Adjust threshold as needed
+            print("SAFETY: Maximum iterations reached, forcing termination")
+            return {
+                "response": "Task execution reached maximum number of steps. Here's what was accomplished:\n" + 
+                           "\n".join([f"- {step}" for step, _ in state.past_steps[:10]]) + 
+                           ("\n... and more" if len(state.past_steps) > 10 else ""),
+                "app_plan": []
+            }
+        
+        # Format past steps
+        past_steps_formatted = "\n".join([f"Step: {step}\nResult: {result[:200]}..." if len(result) > 200 else f"Step: {step}\nResult: {result}" for step, result in state.past_steps])
+        
+        # Create replanner prompt with explicit completion instruction
+        replanner_prompt = ChatPromptTemplate.from_template(
+        """You are an expert app developer and architect.
+        Your objective was: {input}
+        Your design template is: {design_template}
+        Your original plan was: {app_plan}
+        You have completed these steps: {past_steps}
+
+        Update your plan accordingly. Only include steps that still NEED to be done.
+        If all steps are complete, provide a final response summarizing what was accomplished."""
+            )
+        
+        input_content = state.input[-1].content if state.input else ""
+        # Track original plan for context
+        original_plan = state.app_plan + [step for step, _ in state.past_steps]
+        
+        replanner_message = replanner_prompt.format_messages(
+            input=input_content,
+            design_template=state.design_template,
+            original_plan=original_plan,
+            past_steps=past_steps_formatted
+        )
+        
+        print(f"REPLAN: Evaluating progress with {len(state.past_steps)} steps completed and {len(state.app_plan)} steps remaining")
+        
+        replanner = await get_model(
+            model_name=state.model_name, 
+            test=state.test,
+            parser=Action
+        )
+        
+        output = await replanner.ainvoke(replanner_message)
+        
+        print(f"REPLAN OUTPUT TYPE: {type(output.action)}")
+        
+        if isinstance(output.action, Response):
+            print("REPLAN: Task complete - returning final response")
+            return {"response": output.action.response, "app_plan": []}
+        else:  # AppPlan
+            if not output.action.steps:
+                print("REPLAN: Empty plan received - treating as completion")
+                return {"response": "Task completed successfully!", "app_plan": []}
+                
+            print(f"REPLAN: Continuing with {len(output.action.steps)} new/updated steps")
+            return {"app_plan": output.action.steps}
+    
+    return replan_step
+
+# Create the graph with dependency injection for tools and checkpointer
+async def create_agent_graph(tools: list = [], checkpointer=None):
+    """
+    Create the app development agent graph with optional tools and checkpointer
+    
+    Args:
+        tools: Optional list of tools to use for the agent
+        checkpointer: Optional checkpointer for persistence
+    
+    Returns:
+        Compiled graph for app development
+    """
+    execute_step = await get_execution_agent(
+        tools=tools,
+    )
+    plan_step = await get_plan_step()
+    replan_step = await get_replan_step()
+
+    # Decision function
+    def should_continue(state: AgentState) -> str:
+        if state.response:
+            print(f"DECISION: Ending flow - response provided: {state.response[:30]}...")
+            return END
+        elif state.app_plan and len(state.app_plan) > 0:
+            print(f"DECISION: Continuing execution with {len(state.app_plan)} steps")
+            return "execute"
+        else:
+            print("DECISION: No steps left, going to replan")
+            return "replan"
+
+
+    workflow = StateGraph(AgentState)
+    
+    # Add nodes
+    workflow.add_node("planner", plan_step)
+    workflow.add_node("execute", execute_step)
+    workflow.add_node("replan", replan_step)
+    
+    # Add edges
+    workflow.add_edge(START, "planner")
+    workflow.add_edge("planner", "execute")
+    workflow.add_edge("execute", "replan")
+    workflow.add_conditional_edges(
+        "replan",
+        should_continue,
+        {
+            "execute": "execute",
+            END: END
+        }
+    )
+    
+    
+    # Add checkpointer if provided
+    if checkpointer is not None:
+        workflow.compile(checkpointer=checkpointer)
+    
+    # Compile the graph
+    return workflow.compile()
+
+# Example usage - but now async
+async def develop_app(user_request, design_template, cwd=".", model_name="gpt-4o", test=False):
+    app_dev_agent = await create_agent_graph()
+    
+    # Initialize state using Pydantic model
+    initial_state = AgentState(
+        input=user_request,
+        design_template=design_template,
+        cwd=cwd,
+        model_name=model_name,
+        test=test
+    )
+    
+    result = await app_dev_agent.ainvoke(initial_state)
+    
+    print("\n=== APP DEVELOPMENT COMPLETE ===")
+    print(f"User Request: {user_request}")
+    print(f"Test Mode: {test}")
+    print("\n=== Files Created ===")
+    for filepath, content in result.files_created.items():
+        print(f"\n--- {filepath} ---")
+        print(content[:200] + "..." if len(content) > 200 else content)
+    
+    print("\n=== Final Response ===")
+    print(result.response)
+    
+    return result
+
+# Stream results during app development
+async def stream_app_development(user_request, design_template, cwd=".", model_name="gpt-4o", test=False):
+    app_dev_agent = await create_agent_graph()
+    
+    # Initialize state using Pydantic model
+    initial_state = AgentState(
+        input=user_request,
+        design_template=design_template,
+        cwd=cwd,
+        model_name=model_name,
+        test=test
+    )
+    
+    print("Starting app development process...")
+    print(f"Test Mode: {test}")
+    
+    async for event in app_dev_agent.astream(initial_state):
+        if "planner" in event:
+            print(f"Planning step: {event['planner']}")
+        elif "execute" in event:
+            print(f"Executing step: {event['execute']}")
+        elif "replan" in event:
+            print(f"Replanning step: {event['replan']}")
+    print("\n=== App Development Complete ===")
+
+# Example execution
+if __name__ == "__main__":
+    import asyncio
+    
+    user_request = "Create a simple Todo app with React"
+    
+    # Test the pipeline with test mode
+    #asyncio.run(stream_app_development(user_request, design_template, test=True))
+    
+    # Run with actual models
+    asyncio.run(stream_app_development([HumanMessage(content=user_request)], design_template, test=False))

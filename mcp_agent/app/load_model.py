@@ -48,9 +48,12 @@ def load_model(model_name, tools=None, prompt=None, parser=False):
 
     if prompt:
         chain = prompt | model
+        if parser:
+            model = chain.with_structured_output(schema=parser)
+        
         return chain
 
-    # Create a structured model based on the parser parameter
+    # Create a chain based on the parser parameter
     if parser:
         model = model.with_structured_output(schema=parser)
 

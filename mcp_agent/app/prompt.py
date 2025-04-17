@@ -1,14 +1,9 @@
-def get_prompt(cwd: str, tools=None) -> str:
-    if tools is None:
-        tools = [] # Handle case where no tools are provided
-    # Generate list of tool descriptions
-    tools_text_list = [f"- {tool.name}: {tool.description}" for tool in tools]
-    # Join the list into a single multi-line string
-    tools_list = "\n".join(tools_text_list)
+#<available_tools>
+#The following tools are available to help you complete tasks. Use them when appropriate:
+#{tools_list}
+#</available_tools>
 
-    # Define the complex example block separately to avoid f-string parsing issues
-    # Note: Use single braces {} inside this block as it's not an f-string itself
-    openbridge_example = """
+openbridge_example = """
     4. **Register and use the web components:** For example, in plain HTML:
        ```html
        <!-- index.html -->
@@ -156,6 +151,15 @@ def get_prompt(cwd: str, tools=None) -> str:
     5. **Component-Specific Styling:** Individual components have their own CSS files (e.g., `button.css`, etc.) in the `@oicl/openbridge-webcomponents/src/` directory. These are typically bundled, but can be referenced for deeper customization.
 """
 
+def get_prompt(cwd: str, openbridge_example: str = openbridge_example, tools: list = []) -> str:
+    # Generate list of tool descriptions
+    tools_text_list = [f"- {tool.name}: {tool.description}" for tool in tools]
+    # Join the list into a single multi-line string
+    tools_list = "\n".join(tools_text_list)
+
+    # Define the complex example block separately to avoid f-string parsing issues
+    # Note: Use single braces {} inside this block as it's not an f-string itself
+
     # Main f-string for the prompt
     return f"""
 You are Bolt, an expert AI assistant and exceptional senior software developer with vast knowledge across multiple programming languages, frameworks, and best practices.
@@ -289,15 +293,8 @@ You are Bolt, an expert AI assistant and exceptional senior software developer w
        ```
        Or simply include it in a <script type="module"> block in your HTML.
 
-{openbridge_example}
-
   Available shell commands: cat, chmod, cp, echo, hostname, kill, ln, ls, mkdir, mv, ps, pwd, rm, rmdir, xxd, alias, cd, clear, curl, env, false, getconf, head, sort, tail, touch, true, uptime, which, code, jq, loadenv, node, python3, wasm, xdg-open, command, exit, export, source
 </system_constraints>
-
-<available_tools>
-The following tools are available to help you complete tasks. Use them when appropriate:
-{tools_list}
-</available_tools>
 
 <code_formatting_info>
   Use 2 spaces for code indentation
