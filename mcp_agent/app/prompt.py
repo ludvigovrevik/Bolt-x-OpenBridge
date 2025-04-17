@@ -1,7 +1,4 @@
-def get_prompt(cwd: str, tools=None) -> str:
-    if tools is None:
-        tools = [] # Handle case where no tools are provided
-    # Generate list of tool descriptions
+def get_prompt(cwd: str = '.', tools: list = []) -> str:
     tools_text_list = [f"- {tool.name}: {tool.description}" for tool in tools]
     # Join the list into a single multi-line string
     tools_list = "\n".join(tools_text_list)
