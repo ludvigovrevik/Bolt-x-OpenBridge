@@ -51,37 +51,6 @@ class ConfigLLM(BaseModel):
     model_name: str = os.getenv("LLM_MODEL_NAME", "gpt-4.1")
     temperature: float = 0.0
 
-def get_design_template(openbridge_example):
-    return """
-        Project Structure:
-        - src/
-        - components/
-            - Each component should have its own folder
-            - Each folder should contain index.js and styles.css
-        - utils/
-        - pages/
-        - App.js
-        - index.js
-        
-        Styling:
-        - Use CSS modules
-        - Follow BEM naming convention
-        - Use a color scheme of #f5f5f5, #4a90e2, #50e3c2
-        
-        Component Structure:
-        - Functional components with hooks
-        - Props should be destructured
-        - Each component should have propTypes
-        
-        State Management:
-        - Use React Context API for global state
-        - Use useReducer for complex state logic
-
-        Example of what we want:
-        {openbridge_example}
-
-        """.format(openbridge_example=openbridge_example)
-
 # Update the MCPAgent class with these key changes
 class MCPAgent:
     def __init__(self):
@@ -154,7 +123,7 @@ class MCPAgent:
             cwd=os.getcwd(),
             model_name=self.llm.model_name,
             input=input,
-            design_template=get_design_template(openbridge_example),
+            #design_template=get_design_template(openbridge_example),
         )
 
         # Use proper input format for the graph

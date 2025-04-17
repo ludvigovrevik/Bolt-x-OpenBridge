@@ -1,11 +1,4 @@
-def get_prompt(cwd: str = '.', tools: list = []) -> str:
-    tools_text_list = [f"- {tool.name}: {tool.description}" for tool in tools]
-    # Join the list into a single multi-line string
-    tools_list = "\n".join(tools_text_list)
-
-    # Define the complex example block separately to avoid f-string parsing issues
-    # Note: Use single braces {} inside this block as it's not an f-string itself
-    openbridge_example = """
+openbridge_example = """
     4. **Register and use the web components:**
 
        **Example 1: General Component Usage**
@@ -332,7 +325,16 @@ def get_prompt(cwd: str = '.', tools: list = []) -> str:
        - **Component Imports:** Ensure you import the specific `.js` files for all used automation components (e.g., `automation-tank.js`, `vertical-line.js`, `valve-analog-three-way-icon.js`, etc.) and any icons (e.g., `obi-08-pump-on-horisontal.js`).
        - **Properties:** Set component properties directly via JavaScript (e.g., `tankElement.value = 50; tankElement.medium = 'water';`) or HTML attributes where applicable (e.g., `<obc-vertical-line length="5">`). Remember attribute names are lowercase.
        - **Logic:** Implement dynamic behavior (like tank filling/emptying, line medium changes) using plain JavaScript, updating component properties based on simulation state.
-"""
+""" 
+
+def get_prompt(cwd: str = '.', tools: list = []) -> str:
+    tools_text_list = [f"- {tool.name}: {tool.description}" for tool in tools]
+    # Join the list into a single multi-line string
+    tools_list = "\n".join(tools_text_list)
+
+    # Define the complex example block separately to avoid f-string parsing issues
+    # Note: Use single braces {} inside this block as it's not an f-string itself
+  
 
     # Main f-string for the prompt
     return f"""

@@ -17,7 +17,7 @@ from langchain_core.prompts import ChatPromptTemplate
 # Define the state as a Pydantic model for dot walking
 class AgentState(BaseModel):
     input: Annotated[List[BaseMessage], operator.add]  # User's input
-    design_template: str  # User's design template
+    #design_template: str  # User's design template
     app_plan: List[str] = []  # Detailed app development plan
     past_steps: Annotated[List[Tuple[str, str]], operator.add] = []  # Previously executed steps (step, result)
     files_created: Annotated[Dict[str, str], operator.or_] = {}  # Files created so far (filepath, content)
@@ -43,65 +43,6 @@ class Action(BaseModel):
         description="Action to perform. Use Response to respond to user or AppPlan to create/update plan."
     )
 
-# Mock LLM for testing
-class MockChatModel(BaseChatModel):
-    """Mock Chat Model for testing purposes"""
-    
-    def __init__(self):
-        super().__init__()
-   
-    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
-        """Synchronous generate method required by BaseChatModel"""
-        raise NotImplementedError("MockChatModel only supports async generation")
-    
-    async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
-        """Mock generation method that returns predetermined responses based on the prompt"""
-        from langchain_core.messages import AIMessage
-        from langchain_core.outputs import ChatGeneration, ChatResult
-        import json
-        
-        prompt = messages[0].content if messages else ""
-        
-        # Return different mock responses based on the content of the prompt
-        if "create a detailed step-by-step plan" in prompt.lower():
-            # Return a mock plan - use JSON string instead of dict
-            steps = [
-                "Create project structure",
-                "Set up React components",
-                "Implement state management",
-                "Add styling"
-            ]
-            # For structured output, use JSON string format
-            content = json.dumps({"steps": steps})
-            response = AIMessage(content=content)
-        elif "executing step" in prompt.lower():
-            # Mock file content generation
-            step = prompt.split("executing step:")[1].strip().split("\n")[0] if "executing step:" in prompt else "Unknown step"
-            
-            if "project structure" in step.lower():
-                content = "// Project structure setup\nconsole.log('Project structure created');"
-            elif "react components" in step.lower():
-                content = "import React from 'react';\n\nfunction Component() {\n  return <div>Mock Component</div>;\n}\n\nexport default Component;"
-            elif "state management" in step.lower():
-                content = "import { createContext, useReducer } from 'react';\n\nexport const AppContext = createContext();\n\nconst initialState = { tasks: [] };"
-            elif "styling" in step.lower():
-                content = ".component {\n  color: #4a90e2;\n  background-color: #f5f5f5;\n}"
-            else:
-                content = f"// Mock implementation for: {step}"
-                
-            response = AIMessage(content=content)
-        else:
-            # Default mock response
-            content = "Mock response for testing purposes."
-            response = AIMessage(content=content)
-        
-        generation = ChatGeneration(message=response)
-        return ChatResult(generations=[generation])
-    
-    @property
-    def _llm_type(self):
-        return "mock-chat-model"
-
 # Factory function to get the appropriate model
 async def get_model(tools: list = [], prompt: Any =None, parser: BaseModel = None, 
                     model_name: str = None, 
@@ -109,30 +50,112 @@ async def get_model(tools: list = [], prompt: Any =None, parser: BaseModel = Non
     """
     Get the appropriate model based on test flag and model name
     """
-    if test:
-        return MockChatModel()
-    else:
-        return load_model(
-            model_name=model_name,
-            tools=tools,
-            prompt=prompt,
-            parser=parser
-            )
+    return load_model(
+        model_name=model_name,
+        tools=tools,
+        prompt=prompt,
+        parser=parser
+        )
 
-# Mock implementation of get_prompt function
-def get_mock_prompt(cwd: str, design_template: str) -> str:
-    """
-    Get formatting instructions for the current working directory.
-    This function returns a system message with formatting instructions.
-    """
-    return f"""You are creating files in the directory: {cwd}
 
-FORMATTING INSTRUCTIONS:
-{design_template}
+# Create the planning agent with structured output
+from .prompt import openbridge_example
 
-Follow these instructions exactly when creating files. Do not add any filepath information or output modifications.
-Return only the content of the file as plain text.
+DESIGNER_PROMPT = f"""
+You are Bolt-UI, an expert UI/UX designer and frontend architect specializing in OpenBridge design system.
+
+<design_requirements>
+1. Current Project State:
+   - CWD: {{cwd}}
+   - Existing Files: {{file_list}}
+   - Previous Specification: {{prev_spec}}
+
+2. Required Output:
+   - Full implementation-ready design specification
+   - Must include ALL fields from the format above
+   - Technical details must match WebContainer constraints
+   - Component versions must match OpenBridge requirements
+</design_requirements>
+
+<design_constraints>
+- Strictly use @oicl/openbridge-webcomponents@0.0.17+
+- ES modules only (no CommonJS)
+- Vite-based build system
+- Mobile-first responsive design
+- Performance budget: 100ms main thread work per interaction
+</design_constraints>
+
+<output_instructions>
+1. Generate complete specification using JSON format
+2. Validate against the provided schema
+3. Ensure technical feasibility in WebContainer
+4. Include implementation-ready configuration details
+5. Maintain consistency with previous spec iterations
+</output_instructions>
 """
+def get_design_template(openbridge_example):
+    return """
+        Project Structure:
+        - src/
+        - components/
+            - Each component should have its own folder
+            - Each folder should contain index.js and styles.css
+        - utils/
+        - pages/
+        - App.js
+        - index.js
+        
+        Styling:
+        - Use CSS modules
+        - Follow BEM naming convention
+        - Use a color scheme of #f5f5f5, #4a90e2, #50e3c2
+        
+        Component Structure:
+        - Functional components with hooks
+        - Props should be destructured
+        - Each component should have propTypes
+        
+        State Management:
+        - Use React Context API for global state
+        - Use useReducer for complex state logic
+
+        Example of what we want:
+        {openbridge_example}
+
+        """.format(openbridge_example=openbridge_example)
+
+# Need to work on this prompt to make it more specific to the task
+# Plan step function
+async def get_plan_step():
+    async def plan_step(state: AgentState) -> dict:
+        input = state.input[-1].content
+        planner_prompt = ChatPromptTemplate.from_messages([
+            ("system", """You are an expert app designer and architect. 
+    For the given objective and design template, create a detailed step-by-step plan with NO MORE THAN 8 STEPS for developing the app..
+    Break down the app development into logical components and files to be created.
+    Each step should be specific and actionable, focusing on one file or component at a time.
+    The plan should be comprehensive and cover all aspects of the app.
+    Consider project structure, dependencies, components, styling, and functionality."""),
+            ("user", "Design Template: {design_template}\n\nObjective: {input}"),
+        ])
+
+        planner_message = planner_prompt.format_messages(
+            design_template=get_design_template(openbridge_example),
+            input=input
+        )
+
+        planner = await get_model(
+            model_name=state.model_name, 
+            test=state.test,
+            parser=AppPlan
+            )
+            
+        
+        plan_result = await planner.ainvoke(planner_message)
+        return {"app_plan": plan_result.steps}
+    return plan_step
+
+
 
 # Execute step function
 async def get_execution_agent(tools: List[Any]):
@@ -194,70 +217,7 @@ async def get_execution_agent(tools: List[Any]):
     
     return execute_step
 
-# Create the planning agent with structured output
 
-DESIGNER_PROMPT = f"""
-You are Bolt-UI, an expert UI/UX designer and frontend architect specializing in OpenBridge design system.
-
-<design_requirements>
-1. Current Project State:
-   - CWD: {{cwd}}
-   - Existing Files: {{file_list}}
-   - Previous Specification: {{prev_spec}}
-
-2. Required Output:
-   - Full implementation-ready design specification
-   - Must include ALL fields from the format above
-   - Technical details must match WebContainer constraints
-   - Component versions must match OpenBridge requirements
-</design_requirements>
-
-<design_constraints>
-- Strictly use @oicl/openbridge-webcomponents@0.0.17+
-- ES modules only (no CommonJS)
-- Vite-based build system
-- Mobile-first responsive design
-- Performance budget: 100ms main thread work per interaction
-</design_constraints>
-
-<output_instructions>
-1. Generate complete specification using JSON format
-2. Validate against the provided schema
-3. Ensure technical feasibility in WebContainer
-4. Include implementation-ready configuration details
-5. Maintain consistency with previous spec iterations
-</output_instructions>
-"""
-
-# Plan step function
-async def get_plan_step():
-    async def plan_step(state: AgentState) -> dict:
-        input = state.input[-1].content
-        planner_prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are an expert app designer and architect. 
-    For the given objective and design template, create a detailed step-by-step plan for developing the app.
-    Break down the app development into logical components and files to be created.
-    Each step should be specific and actionable, focusing on one file or component at a time.
-    The plan should be comprehensive and cover all aspects of the app.
-    Consider project structure, dependencies, components, styling, and functionality."""),
-            ("user", "Design Template: {design_template}\n\nObjective: {input}"),
-        ])
-
-        planner_message = planner_prompt.format_messages(
-            design_template=state.design_template,
-            input=input
-        )
-
-        planner = await get_model(
-            model_name=state.model_name, 
-            test=state.test,
-            parser=AppPlan
-            )
-            
-        
-        plan_result = await planner.ainvoke(planner_message)
-        return {"app_plan": plan_result.steps}
-    return plan_step
 
 # Replan step function
 async def get_replan_step():
@@ -322,6 +282,8 @@ async def get_replan_step():
             return {"app_plan": output.action.steps}
     
     return replan_step
+
+
 
 # Create the graph with dependency injection for tools and checkpointer
 async def create_agent_graph(tools: list = [], checkpointer=None):
