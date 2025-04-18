@@ -23,22 +23,19 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional # Added Any, Optional
 import os
+from pathlib import Path
 from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
 from langchain_core.messages import (
     HumanMessage, AIMessage, SystemMessage, BaseMessage)
 import asyncio
-from langgraph.prebuilt import create_react_agent
 from langchain_mcp_tools import convert_mcp_to_langchain_tools
 from langgraph.checkpoint.memory import MemorySaver
 import json
 from langchain_core.prompts import ChatPromptTemplate
 from .prompts.artifact_prompt import get_prompt
 from .load_model import load_model
-#from .graph import create_agent_graph, AgentState
 from .graph_demo import create_agent_graph, AgentState
 from .prompt import openbridge_example
-#from .prompt import get_prompt
 import logging # Add logging import
 
 load_dotenv()
@@ -56,8 +53,7 @@ class MCPAgent:
     def __init__(self):
         self.llm = ConfigLLM()
         # Update repo_root to point to Bolt-x-OpenBridge (3 dirs up from main.py)
-        current_file_path = os.path.abspath(__file__)
-        self.repo_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file_path)))
+        self.repo_root = Path(__file__).resolve().parents[2]
         self.frontend = os.path.join(self.repo_root, "app")
         print(self.repo_root)
         self.mcp_servers = {
@@ -77,13 +73,6 @@ class MCPAgent:
                     "mcp-figma"
                 ]
             },
-#             "sequential-thinking": {
-#                 "command": "npx",
-#                 "args": [
-#                     "-y",
-#                     "@modelcontextprotocol/server-sequential-thinking"
-#                 ]
-#             },
             }
         self.tools = None
         self.cleanup_func = None
@@ -98,7 +87,12 @@ class MCPAgent:
         return [SystemMessage(content=get_prompt(cwd, self.tools))]
 
     async def initialize(self):
-        self.tools, self.cleanup_func = await convert_mcp_to_langchain_tools(self.mcp_servers)
+        try:
+            self.tools, self.cleanup_func = await convert_mcp_to_langchain_tools(self.mcp_servers)
+        except Exception as e:
+            logger.exception("Failed to launch MCP servers")
+            raise
+
         # Remove the nested initialize function and create the graph directly
         if self.tools:
             self.graph = await create_agent_graph(
@@ -119,11 +113,14 @@ class MCPAgent:
 
     async def astream_events(self, input: List[BaseMessage], config: dict):
         # Convert input messages to AgentState format
+        # Find the last HumanMessage to use as the primary input for the planner
+        last_human_message = next((msg for msg in reversed(input) if isinstance(msg, HumanMessage)), None)
+
         initial_state = AgentState(
             cwd=os.getcwd(),
             model_name=self.llm.model_name,
-            input=input,
-            #design_template=get_design_template(openbridge_example),
+            input_message=last_human_message, # Pass the last human message
+            # design_template is handled within agents now
         )
 
         # Use proper input format for the graph
@@ -164,15 +161,14 @@ class ChatRequest(BaseModel):
 async def startup_event():
     app.state.agent = MCPAgent()
     await app.state.agent.initialize() # Initialize the agent
-    # Additional setup if needed
     print("Application startup complete")
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    if hasattr(app.state.agent, 'cleanup'):
-        await app.state.agent.cleanup()
-    # Additional cleanup if needed
+    if getattr(app.state.agent, 'cleanup_func', None):
+        await app.state.agent.cleanup_func()
+
     print("Application shutdown complete")
 
 
@@ -222,10 +218,8 @@ async def chat_endpoint(request: ChatRequest):
             async for event in app.state.agent.astream_events(
                 input=langchain_messages, # Corrected: Pass the list directly
                 config=config
-                # Removed incorrect stream_mode argument here
             ):
                 event_name = event.get("event")
-                #logger.info(f"--- Agent Event Received: {event_name} ---") # Log inside loop
 
                 # Focus ONLY on the event carrying content chunks from the LLM stream
                 if event_name == "on_chat_model_stream":
@@ -270,11 +264,9 @@ async def chat_endpoint(request: ChatRequest):
                             if close_pos != -1:
                                 # Found closing tag - yield content up to close tag
                                 artifact_content = to_process[:close_pos]
-                                # Removed logging
                                 yield artifact_content
 
                                 # Emit closing tag
-                                # Removed logging
                                 yield '</boltArtifact>'
 
                                 artifact_stack.pop()
@@ -291,7 +283,6 @@ async def chat_endpoint(request: ChatRequest):
                                 # Found opening tag - yield content before tag
                                 if open_pos > 0:
                                     plain_text = to_process[:open_pos]
-                                    # Removed logging
                                     yield plain_text
 
                                 # Find end of opening tag
@@ -299,7 +290,6 @@ async def chat_endpoint(request: ChatRequest):
                                 if tag_end_pos != -1:
                                     # Complete tag found - yield it
                                     tag_content = to_process[open_pos:tag_end_pos + 1]
-                                    # Removed logging
                                     yield tag_content
 
                                     artifact_stack.append(True)  # Mark we're in an artifact
@@ -311,26 +301,17 @@ async def chat_endpoint(request: ChatRequest):
                                     break
                             else:
                                 # No tags - yield all as plain text
-                                # Removed logging
                                 yield to_process
                                 to_process = "" # Ensure loop terminates
                                 break
                 # --- End of Artifact Parsing Logic ---
-                # else: # Optionally handle other event types if needed for debugging
-                #    logger.info(f"Other event data: {event.get('data')}")
 
             # Handle any remaining buffer content after the loop finishes
             if buffer:
-                # Removed logging
                 yield buffer
-
-            # Final state logging (optional, might be noisy)
-            # final_state = app.state.agent.graph.get_state(config).values
-            # print(f"Final state: {final_state}")
-            # Let's comment out the final state print for now as it might change
-            # Removed the extra pass and duplicated final_state print
 
         print("Finished graph execution!")
         return StreamingResponse(event_stream(), media_type="text/event-stream")
     except Exception as e:
+        logger.exception("chat_endpoint failed")
         raise HTTPException(status_code=500, detail=str(e))

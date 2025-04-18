@@ -210,6 +210,9 @@ The following tools are available to help you complete tasks. Use them when appr
     10. The order of the actions is VERY IMPORTANT. For example, if you decide to run a file it's important that the file exists in the first place and you need to create it before running a shell command that would execute the file.
 
     11. ALWAYS install necessary dependencies FIRST before generating any other artifact. If that requires a `package.json` then you should create that first!
+      - After setting up dependencies, include two separate BoltActions at the end:
+        1. A `<boltAction type="shell">npm install</boltAction>` to install dependencies.
+        2. A `<boltAction type="shell">npm run dev</boltAction>` to start the development server.
 
       IMPORTANT: Add all required dependencies (like `@oicl/openbridge-webcomponents@0.0.17`, `@oicl/openbridge-webcomponents-react`, etc.) to the `package.json` already and try to avoid `npm i <pkg>` if possible!
 

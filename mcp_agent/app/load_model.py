@@ -13,7 +13,17 @@ logging.basicConfig(level=logging.INFO)
 load_dotenv()
 
 
-def load_model(model_name, tools=None, prompt=None, parser=False):
+# Initialize default Gemini model
+model = ChatGoogleGenerativeAI(
+    model="gemini-pro",
+    temperature=0,
+    max_tokens=None,
+    timeout=60,
+    max_retries=2,
+    api_key=os.getenv('GOOGLE_API_KEY')
+)
+
+def load_model(model_name, tools=None, prompt=None, parser=None):
     """Load the model dynamically based on the parameter."""
     # Initialize the model based on the model_name
     if 'gemini' in model_name:
@@ -47,15 +57,14 @@ def load_model(model_name, tools=None, prompt=None, parser=False):
         model = model.bind_tools(tools)
 
     if prompt:
-        chain = prompt | model
-        if parser:
-            model = chain.with_structured_output(schema=parser)
-        
-        return chain
+        # Return a simple Prompt → Model chain, no structured-output
+        return prompt | model
 
-    # Create a chain based on the parser parameter
+    # Configure structured output if parser is provided
     if parser:
-        model = model.with_structured_output(schema=parser)
+        from langchain_core.output_parsers import PydanticOutputParser
+        output_parser = PydanticOutputParser(pydantic_object=parser)
+        return model.with_structured_output(parser)
 
     # Default chain without parser
     return model
