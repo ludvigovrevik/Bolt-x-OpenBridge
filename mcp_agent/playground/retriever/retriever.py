@@ -3,7 +3,9 @@ from dotenv import load_dotenv
 from langchain_openai import OpenAIEmbeddings
 from langchain_openai import ChatOpenAI
 from langchain_community.vectorstores import FAISS
-from langchain.chains import RetrievalQA
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain.chains import create_retrieval_chain
+from langchain import hub
 
 
 # Load environment variables
@@ -36,18 +38,29 @@ retriever = vector_store.as_retriever(
 )
 
 # Simple test query
-test_query = "What is RAG?"
+test_query = """
+You are a coding assistant. Produce a JSON object describing the “azimuth thuster” component with exactly these keys:
+1. name: the class or tag name
+2. description: one‑sentence summary
+3. properties: an array of { name, type, default }
+4. example: a minimal code snippet showing basic usage
 
-# Build a QA chain using the new RetrievalQA facade
-qa_chain = RetrievalQA.from_chain_type(
-    llm=ChatOpenAI(temperature=0, openai_api_key=openai_api_key),
-    chain_type="stuff",
+Respond with valid JSON only—no extra text."""
+
+# Build a retrieval-augmented generation (RAG) chain
+retrieval_qa_chat_prompt = hub.pull("langchain-ai/retrieval-qa-chat")
+stuff_chain = create_stuff_documents_chain(
+    ChatOpenAI(temperature=0, openai_api_key=openai_api_key),
+    retrieval_qa_chat_prompt
+)
+rag_chain = create_retrieval_chain(
     retriever=retriever,
+    combine_docs_chain=stuff_chain
 )
 
-# Execute the QA chain using invoke instead of the deprecated run()
-response = qa_chain.invoke({"query": test_query})
-answer = response["result"]
+# Execute the RAG chain
+response = rag_chain.invoke({"input": test_query})
+answer = response["answer"]
 
 # Display output
 print(f"Test query: {test_query}")

@@ -1,55 +1,80 @@
-# minimal example – replace with your own embedding/model keys
-import sys, pathlib, faiss, json, pickle
-import numpy as np
-from sentence_transformers import SentenceTransformer
+# build_vectorstore.py
+import os
+import sys
+import json
+import pathlib
+from dotenv import load_dotenv
+from langchain_openai import OpenAIEmbeddings
+from langchain_community.vectorstores import FAISS
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.schema import Document
 
-model = SentenceTransformer("all-MiniLM-L6-v2")
-script_dir = pathlib.Path(__file__).parent.absolute()
-docs_dir = script_dir / "kb"  # Use fixed relative path to knowledge base
-manifest_path = script_dir / "kb/manifest_min.json"  # Use existing manifest
-
-if not docs_dir.exists():
-    print(f"Document directory {docs_dir} not found")
+# Load environment
+load_dotenv()
+openai_api_key = os.getenv("OPENAI_API_KEY")
+if not openai_api_key:
+    print("Error: OPENAI_API_KEY not set in environment.")
     sys.exit(1)
 
-# Load file paths from manifest.json
-with open(manifest_path, 'r') as f:
+# Paths
+script_dir = pathlib.Path(__file__).parent.resolve()
+manifest_path = script_dir / "manifest.json"
+
+if not manifest_path.exists():
+    print(f"Manifest file not found at {manifest_path}")
+    sys.exit(1)
+
+# Load manifest
+with open(manifest_path, 'r', encoding='utf-8') as f:
     manifest = json.load(f)
 
-embeds, meta, texts = [], [], []
+# Collect raw documents
+raw_docs = []
 for module in manifest.get("modules", []):
-    if "path" not in module:
-        print(f"Skipping module without path: {module}")
+    path = module.get("path")
+    if not path:
         continue
-        
-    file_path = pathlib.Path(module["path"])
-    if not file_path.is_absolute():
-        file_path = docs_dir / file_path
-
+    file_path = script_dir / path
     if not file_path.exists():
-        print(f"File not found: {file_path}")
-        continue
-
+        # 1) Try resolving from project root 'src' folder
+        repo_root = script_dir.parents[2]
+        alt_path = repo_root / path
+        if alt_path.exists():
+            file_path = alt_path
+        else:
+            # 2) Fallback to node_modules/@oicl/openbridge-webcomponents
+            alt_pkg = repo_root / "node_modules" / "@oicl" / "openbridge-webcomponents" / path
+            if alt_pkg.exists():
+                file_path = alt_pkg
+            else:
+                print(f"Skipping missing file: {file_path}")
+                continue
     try:
-        txt = file_path.read_text(encoding="utf-8")[:4000]
-        embeds.append(model.encode(txt))
-        meta.append({"path": str(file_path), "module_type": module.get("kind", "unknown")})
-        texts.append(txt)
-        print(f"Processed: {file_path}")
+        content = file_path.read_text(encoding="utf-8")
     except Exception as e:
-        print(f"Error processing {file_path}: {str(e)}")
+        print(f"Error reading {file_path}: {e}")
+        continue
+    raw_docs.append(Document(page_content=content, metadata={
+        "path": str(file_path),
+        "kind": module.get("kind", "")
+    }))
+print(f"Loaded {len(raw_docs)} documents from manifest.")
 
-if not embeds:
-    print("No files found to embed. Exiting.")
+if not raw_docs:
+    print("No documents to process. Exiting.")
     sys.exit(1)
 
-index = faiss.IndexFlatL2(len(embeds[0]))
-index.add(np.array(embeds).astype("float32"))
-faiss.write_index(index, str(docs_dir / "index.faiss"))
-json.dump(meta, open(docs_dir / "index_meta.json", "w"))
+# Split into chunks
+splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+docs = splitter.split_documents(raw_docs)
+print(f"Split into {len(docs)} chunks.")
 
-# Save the required pickle file for LangChain FAISS loader
-with open(docs_dir / "index.pkl", "wb") as f:
-    pickle.dump((texts, meta), f)
+# Embed and build FAISS
+embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
+vector_store = FAISS.from_documents(docs, embeddings)
 
-print("vector store ready")
+# Persist the index
+output_dir = script_dir / "kb"
+output_dir.mkdir(exist_ok=True)
+vector_store.save_local(folder_path=str(output_dir), index_name="index")
+print("✅ Rebuilt FAISS index with dimension:", vector_store.index.d)
