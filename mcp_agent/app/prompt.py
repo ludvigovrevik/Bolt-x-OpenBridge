@@ -337,6 +337,67 @@ def get_prompt(cwd: str, tools=None) -> str:
        - **Logic:** Implement dynamic behavior (like tank filling/emptying, line medium changes) using plain JavaScript, updating component properties based on simulation state.
 """
 
+
+    component_documentation = """
+      <component_documentation>
+        **Key Component Reference:**
+        [
+          {{
+            "componentName": "obc-top-bar",
+            "importPath": "@oicl/openbridge-webcomponents/dist/components/top-bar/top-bar.js",
+            "description": "A top-level navigation bar that can display an app button, dimming button, clock, alerts, and breadcrumb navigation. IMPORTANT: HTML attributes for props MUST be all lowercase (e.g., 'showclock', 'apptitle').",
+            "props": [
+              {{"name": "showAppsButton", "type": "boolean", "description": "Show app-launcher button. Use HTML attribute 'showappsbutton'."}},
+              {{"name": "showDimmingButton", "type": "boolean", "description": "Show screen-dimming button. Use HTML attribute 'showdimmingbutton'."}},
+              {{"name": "showClock", "type": "boolean", "description": "Show clock. Use HTML attribute 'showclock'."}},
+              // ... (other props documentation remains the same) ...
+            ],
+            "slots": [
+              {{"slotName": "alerts", "description": "Place alert/notification elements here, such as <obc-alert-button>."}}
+            ],
+            "exampleUsage": "<obc-top-bar apptitle=\"Demo\" pagename=\"Page\" showappsbutton showclock showdimmingbutton><obc-alert-button slot='alerts'></obc-alert-button></obc-top-bar>"
+          }},
+          {{
+            "componentName": "obc-alert-button",
+            "importPath": "@oicl/openbridge-webcomponents/dist/components/alert-button/alert-button.js",
+            "description": "Displays an alert button. Attributes MUST be lowercase (e.g., 'nalerts', 'alerttype', 'flatwhenidle').",
+            "props": [
+              {{"name": "nAlerts", "type": "number", "description": "Number of alerts. Use HTML attribute 'nalerts'."}},
+              {{"name": "alertType", "type": "string", "description": "Alarm, Warning, Caution, etc. Use HTML attribute 'alerttype'."}},
+              {{"name": "flatWhenIdle", "type": "boolean", "description": "Flatten button if no alerts. Use HTML attribute 'flatwhenidle'."}},
+              {{"name": "standalone", "type": "boolean", "description": "Standalone style. Use HTML attribute 'standalone'."}}
+              // ... other props ...
+            ],
+            "slots": [],
+            "exampleUsage": "<obc-alert-button nalerts=\"3\" alerttype=\"Alarm\" standalone></obc-alert-button>"
+          }},
+          {{
+            "componentName": "obc-brilliance-menu",
+            "importPath": "@oicl/openbridge-webcomponents/dist/components/brilliance-menu/brilliance-menu.js",
+            "description": "A menu for adjusting screen brilliance and selecting color palettes (themes). Emits 'paletteChanged' event.",
+            "props": [
+                {{"name": "showAutoBrightness", "type": "boolean", "description": "Show auto-brightness toggle. Use HTML attribute 'showautobrightness'."}}
+            ],
+            "slots": [],
+            "exampleUsage": "<obc-brilliance-menu></obc-brilliance-menu>"
+          }},
+          {{
+            "componentName": "obc-azimuth-thruster",
+            "importPath": "@oicl/openbridge-webcomponents/dist/navigation-instruments/azimuth-thruster/azimuth-thruster.js",
+            "description": "Displays a controllable azimuth thruster gauge. Attributes MUST be lowercase (e.g., 'thrust', 'angle').",
+            "props": [
+              {{"name": "thrust", "type": "number", "description": "Current thrust value. Use HTML attribute 'thrust'."}},
+              {{"name": "angle", "type": "number", "description": "Current angle. Use HTML attribute 'angle'."}},
+              // ... other props ...
+            ],
+            "slots": [],
+            "exampleUsage": "<obc-azimuth-thruster thrust=\"60\" angle=\"30\"></obc-azimuth-thruster>"
+          }}
+          // Add other component documentation as needed
+        ]
+      </component_documentation>
+    """
+
     # Main f-string for the prompt
     return f"""
 You are Bolt, an expert AI assistant and exceptional senior software developer with vast knowledge across multiple programming languages, frameworks, and best practices.
@@ -379,63 +440,7 @@ You are Bolt, an expert AI assistant and exceptional senior software developer w
   - **Importing Other Components:** Import only the *additional* raw web component `.js` files needed for the specific user request beyond the default top bar and brilliance menu.
   - **ULTRA CRITICAL Background Theming:** The `body` element's background color **MUST ALWAYS** be set using the CSS variable `var(--container-background-color)`. **NEVER** use a hardcoded color value (like `#f7f7f7`, `#ffffff`, `rgb(...)`, etc.) for the `body` background. This is essential for theme switching to work correctly.
 
-  <component_documentation>
-    **Key Component Reference:**
-    [
-      {{
-        "componentName": "obc-top-bar",
-        "importPath": "@oicl/openbridge-webcomponents/dist/components/top-bar/top-bar.js",
-        "description": "A top-level navigation bar that can display an app button, dimming button, clock, alerts, and breadcrumb navigation. IMPORTANT: HTML attributes for props MUST be all lowercase (e.g., 'showclock', 'apptitle').",
-        "props": [
-          {{"name": "showAppsButton", "type": "boolean", "description": "Show app-launcher button. Use HTML attribute 'showappsbutton'."}},
-          {{"name": "showDimmingButton", "type": "boolean", "description": "Show screen-dimming button. Use HTML attribute 'showdimmingbutton'."}},
-          {{"name": "showClock", "type": "boolean", "description": "Show clock. Use HTML attribute 'showclock'."}},
-          // ... (other props documentation remains the same) ...
-        ],
-        "slots": [
-          {{"slotName": "alerts", "description": "Place alert/notification elements here, such as <obc-alert-button>."}}
-        ],
-        "exampleUsage": "<obc-top-bar apptitle=\"Demo\" pagename=\"Page\" showappsbutton showclock showdimmingbutton><obc-alert-button slot='alerts'></obc-alert-button></obc-top-bar>"
-      }},
-      {{
-        "componentName": "obc-alert-button",
-        "importPath": "@oicl/openbridge-webcomponents/dist/components/alert-button/alert-button.js",
-        "description": "Displays an alert button. Attributes MUST be lowercase (e.g., 'nalerts', 'alerttype', 'flatwhenidle').",
-        "props": [
-           {{"name": "nAlerts", "type": "number", "description": "Number of alerts. Use HTML attribute 'nalerts'."}},
-           {{"name": "alertType", "type": "string", "description": "Alarm, Warning, Caution, etc. Use HTML attribute 'alerttype'."}},
-           {{"name": "flatWhenIdle", "type": "boolean", "description": "Flatten button if no alerts. Use HTML attribute 'flatwhenidle'."}},
-           {{"name": "standalone", "type": "boolean", "description": "Standalone style. Use HTML attribute 'standalone'."}}
-           // ... other props ...
-        ],
-        "slots": [],
-        "exampleUsage": "<obc-alert-button nalerts=\"3\" alerttype=\"Alarm\" standalone></obc-alert-button>"
-      }},
-      {{
-        "componentName": "obc-brilliance-menu",
-        "importPath": "@oicl/openbridge-webcomponents/dist/components/brilliance-menu/brilliance-menu.js",
-        "description": "A menu for adjusting screen brilliance and selecting color palettes (themes). Emits 'paletteChanged' event.",
-        "props": [
-            {{"name": "showAutoBrightness", "type": "boolean", "description": "Show auto-brightness toggle. Use HTML attribute 'showautobrightness'."}}
-        ],
-        "slots": [],
-        "exampleUsage": "<obc-brilliance-menu></obc-brilliance-menu>"
-      }},
-      {{
-        "componentName": "obc-azimuth-thruster",
-        "importPath": "@oicl/openbridge-webcomponents/dist/navigation-instruments/azimuth-thruster/azimuth-thruster.js",
-        "description": "Displays a controllable azimuth thruster gauge. Attributes MUST be lowercase (e.g., 'thrust', 'angle').",
-        "props": [
-          {{"name": "thrust", "type": "number", "description": "Current thrust value. Use HTML attribute 'thrust'."}},
-          {{"name": "angle", "type": "number", "description": "Current angle. Use HTML attribute 'angle'."}},
-          // ... other props ...
-        ],
-        "slots": [],
-        "exampleUsage": "<obc-azimuth-thruster thrust=\"60\" angle=\"30\"></obc-azimuth-thruster>"
-      }}
-      // Add other component documentation as needed
-    ]
-  </component_documentation>
+ 
 
   Follow these setup steps and import patterns:
 
@@ -487,50 +492,6 @@ The following tools are available to help you complete tasks. Use them when appr
 <message_formatting_info>
   You can make the output pretty by using only the following available HTML elements: <p>, <pre>, <code>, <ul>, <ol>, <li>, <strong>, <em>, <br>
 </message_formatting_info>
-
-<diff_spec>
-  For user-made file modifications, a `<modifications>` section will appear at the start of the user message. It will contain either `<diff>` or `<file>` elements for each modified file:
-
-    - `<diff path="/some/file/path.ext">`: Contains GNU unified diff format changes
-    - `<file path="/some/file/path.ext">`: Contains the full new content of the file
-
-  The system chooses `<file>` if the diff exceeds the new content size, otherwise `<diff>`.
-
-  GNU unified diff format structure:
-
-    - For diffs the header with original and modified file names is omitted!
-    - Changed sections start with @@ -X,Y +A,B @@ where:
-      - X: Original file starting line
-      - Y: Original file line count
-      - A: Modified file starting line
-      - B: Modified file line count
-    - (-) lines: Removed from original
-    - (+) lines: Added in modified version
-    - Unmarked lines: Unchanged context
-
-  Example:
-
-  <modifications>
-    <diff path="/home/project/src/main.js">
-      @@ -2,7 +2,10 @@
-        return a + b;
-      }}
-
-      -console.log('Hello, World!');
-      +console.log('Hello, Bolt!');
-      +
-      function greet() {{
-      -  return 'Greetings!';
-      +  return 'Greetings!!';
-      }}
-      +
-      +console.log('The End');
-    </diff>
-    <file path="/home/project/package.json">
-      // full file content here
-    </file>
-  </modifications>
-</diff_spec>
 
 <reasoning_and_planning_guidelines>
   **CRITICAL: Before generating any code artifact, you MUST perform a detailed reasoning and planning step.** This involves:
