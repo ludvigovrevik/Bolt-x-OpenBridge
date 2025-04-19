@@ -10,17 +10,24 @@ export function themeIsDark() {
 
 export const DEFAULT_THEME = 'light';
 
-export const themeStore = atom<Theme>(initStore());
+export const themeStore = atom<Theme>(DEFAULT_THEME); // Initialize with default first
 
-function initStore() {
-  if (!import.meta.env.SSR) {
-    const persistedTheme = localStorage.getItem(kTheme) as Theme | undefined;
-    const themeAttribute = document.querySelector('html')?.getAttribute('data-theme');
+function initStoreClient() {
+  // This function runs only on the client after initial render
+  const persistedTheme = localStorage.getItem(kTheme) as Theme | undefined;
+  // Read the theme set by the inline script in root.tsx
+  const themeAttribute = document.querySelector('html')?.getAttribute('data-theme') as Theme | undefined;
 
-    return persistedTheme ?? (themeAttribute as Theme) ?? DEFAULT_THEME;
-  }
+  // Prioritize localStorage, then the html attribute, then default
+  const initialTheme = persistedTheme ?? themeAttribute ?? DEFAULT_THEME;
+  themeStore.set(initialTheme); // Update the store state
+}
 
-  return DEFAULT_THEME;
+// Run the client-side initialization logic after the initial render
+if (!import.meta.env.SSR) {
+  // Use requestAnimationFrame to ensure it runs after the initial paint
+  // and the inline script in root.tsx has definitely run.
+  requestAnimationFrame(initStoreClient);
 }
 
 export function toggleTheme() {
@@ -28,8 +35,6 @@ export function toggleTheme() {
   const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
 
   themeStore.set(newTheme);
-
   localStorage.setItem(kTheme, newTheme);
-
   document.querySelector('html')?.setAttribute('data-theme', newTheme);
 }

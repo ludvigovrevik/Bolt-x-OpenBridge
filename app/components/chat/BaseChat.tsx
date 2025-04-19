@@ -1,5 +1,5 @@
 import type { Message } from 'ai';
-import React, { type RefCallback } from 'react';
+import React, { type RefCallback, type ChangeEvent, type RefObject } from 'react'; // Removed useState, useRef; Added ChangeEvent, RefObject
 import { ClientOnly } from 'remix-utils/client-only';
 import { Menu } from '~/components/sidebar/Menu.client';
 import { IconButton } from '~/components/ui/IconButton';
@@ -25,13 +25,19 @@ interface BaseChatProps {
   sendMessage?: (event: React.UIEvent, messageInput?: string) => void;
   handleInputChange?: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
   enhancePrompt?: () => void;
+  // Add new props from Chat.client.tsx
+  selectedImage?: string | null;
+  fileInputRef?: RefObject<HTMLInputElement>;
+  handleImageUploadClick?: () => void;
+  handleFileChange?: (event: ChangeEvent<HTMLInputElement>) => void;
+  handleRemoveImage?: () => void; // Add prop for removing image
 }
 
 const EXAMPLE_PROMPTS = [
+  { text: 'Build a website with only using openbridge components, use azimuth thruster, compas and topbar' },
+  { text: 'Make a automation website using openbridge' },
   { text: 'Build a todo app in React using Tailwind' },
-  { text: 'Build a simple blog using Astro' },
-  { text: 'Create a cookie consent form using Material UI' },
-  { text: 'Make a space invaders game' },
+  { text: 'Build an OpenBridge website page displaying an azimuth thruster and a compass.' },
   { text: 'How do I center a div?' },
 ];
 
@@ -54,10 +60,17 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
       handleInputChange,
       enhancePrompt,
       handleStop,
+      // Destructure new props
+      selectedImage,
+      fileInputRef,
+      handleImageUploadClick,
+      handleFileChange,
+      handleRemoveImage, // Destructure new prop
     },
     ref,
   ) => {
     const TEXTAREA_MAX_HEIGHT = chatStarted ? 400 : 200;
+    // Removed internal state and handlers - now using props
 
     return (
       <div
@@ -130,7 +143,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                       minHeight: TEXTAREA_MIN_HEIGHT,
                       maxHeight: TEXTAREA_MAX_HEIGHT,
                     }}
-                    placeholder="How can Bolt help you today?"
+                    placeholder="How can Softbridge help you today?"
                     translate="no"
                   />
                   <ClientOnly>
@@ -173,6 +186,39 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                           </>
                         )}
                       </IconButton>
+
+                      {/* Image Upload Button - NEW */}
+                      <IconButton
+                        title="Attach Image"
+                        disabled={enhancingPrompt} // Disable while enhancing
+                        onClick={handleImageUploadClick}
+                        className={classNames({
+                          'bg-bolt-elements-item-backgroundHover': !!selectedImage, // Indicator when image is selected
+                        })}
+                      >
+                        <div className="i-ph:paperclip text-xl"></div>
+                      </IconButton>
+                      {/* Image Attached Indicator & Remove Button - NEW */}
+                      {selectedImage && (
+                        <div className="flex items-center gap-1 ml-1 px-1.5 py-0.5 rounded text-xs bg-bolt-elements-item-backgroundHover text-bolt-elements-item-contentDefault">
+                          <span>Image attached</span>
+                          <IconButton
+                            title="Remove Image"
+                            onClick={handleRemoveImage}
+                            className="p-0.5 text-bolt-elements-item-contentDefault hover:bg-bolt-elements-item-backgroundActive hover:text-bolt-elements-item-contentActive"
+                          >
+                            <div className="i-ph:x-circle text-sm"></div>
+                          </IconButton>
+                        </div>
+                      )}
+                      {/* Hidden File Input - NEW */}
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileChange}
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                      />
                     </div>
                     {input.length > 3 ? (
                       <div className="text-xs text-bolt-elements-textTertiary">

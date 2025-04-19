@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mcp-agent"
+version = "0.1.0"
+description = "MCP Agent for Bolt x OpenBridge"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+dependencies = [
+    "fastapi",
+    "pydantic",
+    "python-dotenv",
+    "langchain-openai",
+    "langgraph",
+    "langchain-mcp-tools",
+    "marshmallow>=3.26.1",
+    "mcp>=1.6.0",
+    "mcp-use>=1.1.5",
+    "numpy>=2.2.0",
+]
+
+[tool.setuptools]
+packages = ["mcp_agent"]
+package-dir = {"mcp_agent" = "app"}

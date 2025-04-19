@@ -1,3 +1,4 @@
+/*
 import { streamText as _streamText, convertToCoreMessages } from 'ai';
 import { getAPIKey } from '~/lib/.server/llm/api-key';
 import { getAnthropicModel } from '~/lib/.server/llm/model';
@@ -33,3 +34,4 @@ export function streamText(messages: Messages, env: Env, options?: StreamingOpti
     ...options,
   });
 }
+*/

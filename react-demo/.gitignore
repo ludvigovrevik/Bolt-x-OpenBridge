@@ -1,3 +1,4 @@
+# Logs
 logs
 *.log
 npm-debug.log*
@@ -11,8 +12,8 @@ dist
 dist-ssr
 *.local
 
+# Editor directories and files
 .vscode/*
-!.vscode/launch.json
 !.vscode/extensions.json
 .idea
 .DS_Store
@@ -21,17 +22,3 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-
-/.cache
-/build
-.env*
-*.vars
-.wrangler
-_worker.bundle
-
-venv/
-.venv
-
-pnpm-lock.yaml/
-package-lock.json/
-openBridgeComponents

@@ -1,3 +1,5 @@
+@use '../z-index' as *;
+
 [data-resize-handle] {
   position: relative;
 

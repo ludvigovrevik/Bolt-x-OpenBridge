@@ -10,6 +10,12 @@ export default defineConfig((config) => {
     build: {
       target: 'esnext',
     },
+    css: {
+      preprocessorOptions: {
+        scss: { api: 'modern-compiler' }, // Use modern-compiler since sass-embedded is installed
+        sass: { api: 'modern-compiler' }
+      }
+    },
     plugins: [
       nodePolyfills({
         include: ['path', 'buffer'],

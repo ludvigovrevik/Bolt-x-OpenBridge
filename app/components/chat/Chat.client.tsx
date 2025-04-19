@@ -2,7 +2,7 @@ import { useStore } from '@nanostores/react';
 import type { Message } from 'ai';
 import { useChat } from 'ai/react';
 import { useAnimate } from 'framer-motion';
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState, useCallback } from 'react'; // Added useCallback
 import { cssTransition, toast, ToastContainer } from 'react-toastify';
 import { useMessageParser, usePromptEnhancer, useShortcuts, useSnapScroll } from '~/lib/hooks';
 import { useChatHistory } from '~/lib/persistence';
@@ -65,9 +65,13 @@ interface ChatProps {
 }
 
 export const ChatImpl = memo(({ initialMessages, storeMessageHistory }: ChatProps) => {
+
+
   useShortcuts();
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null); // Moved Ref up
+  const [selectedImage, setSelectedImage] = useState<string | null>(null); // Moved State up
 
   const [chatStarted, setChatStarted] = useState(initialMessages.length > 0);
 
@@ -85,6 +89,7 @@ export const ChatImpl = memo(({ initialMessages, storeMessageHistory }: ChatProp
       logger.debug('Finished streaming');
     },
     initialMessages,
+    streamProtocol: 'text',
   });
 
   const { enhancingPrompt, promptEnhanced, enhancePrompt, resetEnhancer } = usePromptEnhancer();
@@ -98,7 +103,7 @@ export const ChatImpl = memo(({ initialMessages, storeMessageHistory }: ChatProp
 
   useEffect(() => {
     parseMessages(messages, isLoading);
-
+  
     if (messages.length > initialMessages.length) {
       storeMessageHistory(messages).catch((error) => toast.error(error.message));
     }
@@ -168,33 +173,53 @@ export const ChatImpl = memo(({ initialMessages, storeMessageHistory }: ChatProp
 
     runAnimation();
 
+    // Define messageData *before* the append call
+    const messageData = selectedImage ? { data: { imageData: selectedImage } } : undefined;
+
     if (fileModifications !== undefined) {
       const diff = fileModificationsToHTML(fileModifications);
-
-      /**
-       * If we have file modifications we append a new user message manually since we have to prefix
-       * the user input with the file modifications and we don't want the new user input to appear
-       * in the prompt. Using `append` is almost the same as `handleSubmit` except that we have to
-       * manually reset the input and we'd have to manually pass in file attachments. However, those
-       * aren't relevant here.
-       */
-      append({ role: 'user', content: `${diff}\n\n${_input}` });
-
-      /**
-       * After sending a new message we reset all modifications since the model
-       * should now be aware of all the changes.
-       */
+      // Include messageData here
+      append({ role: 'user', content: `${diff}\n\n${_input}`, ...messageData });
       workbenchStore.resetAllFileModifications();
     } else {
-      append({ role: 'user', content: _input });
+      // Include messageData here
+      append({ role: 'user', content: _input, ...messageData });
     }
 
-    setInput('');
+    // Duplicated block was already removed.
+    // The messageData definition and the second if/else append block are gone.
 
+    setInput('');
+    setSelectedImage(null); // Clear selected image after sending
     resetEnhancer();
 
     textareaRef.current?.blur();
   };
+
+  // Moved handlers up
+  const handleImageUploadClick = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []); // useCallback to prevent unnecessary re-renders of BaseChat
+
+  const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSelectedImage(reader.result as string);
+        console.log('Image selected:', file.name);
+      };
+      reader.readAsDataURL(file);
+    }
+    if (event.target) {
+      event.target.value = '';
+    }
+  }, []); // useCallback
+
+  // Handler to remove the selected image
+  const handleRemoveImage = useCallback(() => {
+    setSelectedImage(null);
+  }, []); // useCallback
 
   const [messageRef, scrollRef] = useSnapScroll();
 
@@ -229,6 +254,12 @@ export const ChatImpl = memo(({ initialMessages, storeMessageHistory }: ChatProp
           scrollTextArea();
         });
       }}
+      // Pass down new props
+      selectedImage={selectedImage}
+      fileInputRef={fileInputRef}
+      handleImageUploadClick={handleImageUploadClick}
+      handleFileChange={handleFileChange}
+      handleRemoveImage={handleRemoveImage} // Pass down the new handler
     />
   );
 });
