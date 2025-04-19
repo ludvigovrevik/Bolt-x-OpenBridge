@@ -1,5 +1,5 @@
 import { type ActionFunctionArgs } from '@remix-run/cloudflare';
-import { StreamingTextResponse, parseStreamPart } from 'ai';
+import { parseStreamPart } from 'ai';
 import { streamText } from '~/lib/.server/llm/stream-text';
 import { stripIndents } from '~/utils/stripIndent';
 
@@ -48,7 +48,11 @@ async function enhancerAction({ context, request }: ActionFunctionArgs) {
 
     const transformedStream = result.toAIStream().pipeThrough(transformStream);
 
-    return new StreamingTextResponse(transformedStream);
+    return new Response(transformedStream, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+      },
+    });
   } catch (error) {
     console.log(error);
 
