@@ -38,7 +38,7 @@ from .load_model import load_model
 #from .graph import create_agent_graph, AgentState
 from .graph_demo import (
     AgentState as ReasoningAgentState,
-    create_reasoning_agent_graph,
+    create_agent_graph as create_reasoning_agent_graph,
     )
 from .graph import create_agent_graph, AgentState
 from .prompt import openbridge_example
@@ -223,7 +223,7 @@ class ChatRequest(BaseModel):
     messages: List[ChatMessage] # Use the new ChatMessage model
     thread_id: str = "default"
     stream: bool = True
-    use_reasoning: bool = True
+    use_reasoning: bool = False
 
 @app.on_event("startup")
 async def startup_event():

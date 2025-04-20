@@ -62,7 +62,10 @@ def create_agent_graph(tools, checkpointer=None):
     workflow.add_conditional_edges(
         "agent",
         should_continue,
-        {"continue": "tools", "end": END}
+        {
+            "continue": "tools", 
+            "end": END
+         }
     )
 
     workflow.add_edge("tools", "agent")

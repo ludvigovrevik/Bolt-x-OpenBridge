@@ -7,11 +7,12 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from pydantic import BaseModel, Field
 from .load_model import load_model
 from .prompt import get_prompt
+from .prompts.designer_prompt import get_designer_prompt
 from langgraph.prebuilt import create_react_agent
 import os
 from langchain_core.messages import BaseMessage, HumanMessage
 from langchain import hub
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, HumanMessagePlaceholder
 
 
 # Define the state as a Pydantic model for dot walking
@@ -58,72 +59,6 @@ async def get_model(tools: list = [], prompt: Any =None, parser: BaseModel = Non
         )
 
 
-# Create the planning agent with structured output
-from .prompt import openbridge_example
-
-DESIGNER_PROMPT = f"""
-You are Bolt-UI, an expert UI/UX designer and frontend architect specializing in OpenBridge design system.
-
-<design_requirements>
-1. Current Project State:
-   - CWD: {{cwd}}
-   - Existing Files: {{file_list}}
-   - Previous Specification: {{prev_spec}}
-
-2. Required Output:
-   - Full implementation-ready design specification
-   - Must include ALL fields from the format above
-   - Technical details must match WebContainer constraints
-   - Component versions must match OpenBridge requirements
-</design_requirements>
-
-<design_constraints>
-- Strictly use @oicl/openbridge-webcomponents@0.0.17+
-- ES modules only (no CommonJS)
-- Vite-based build system
-- Mobile-first responsive design
-- Performance budget: 100ms main thread work per interaction
-</design_constraints>
-
-<output_instructions>
-1. Generate complete specification using JSON format
-2. Validate against the provided schema
-3. Ensure technical feasibility in WebContainer
-4. Include implementation-ready configuration details
-5. Maintain consistency with previous spec iterations
-</output_instructions>
-"""
-def get_design_template(openbridge_example):
-    return """
-        Project Structure:
-        - src/
-        - components/
-            - Each component should have its own folder
-            - Each folder should contain index.js and styles.css
-        - utils/
-        - pages/
-        - App.js
-        - index.js
-        
-        Styling:
-        - Use CSS modules
-        - Follow BEM naming convention
-        - Use a color scheme of #f5f5f5, #4a90e2, #50e3c2
-        
-        Component Structure:
-        - Functional components with hooks
-        - Props should be destructured
-        - Each component should have propTypes
-        
-        State Management:
-        - Use React Context API for global state
-        - Use useReducer for complex state logic
-
-        Example of what we want:
-        {openbridge_example}
-
-        """.format(openbridge_example=openbridge_example)
-
 # Need to work on this prompt to make it more specific to the task
 # Plan step function
 async def get_plan_step():
@@ -137,11 +72,17 @@ async def get_plan_step():
     The plan should be comprehensive and cover all aspects of the app.
     Consider project structure, dependencies, components, styling, and functionality."""),
             ("user", "Design Template: {design_template}\n\nObjective: {input}"),
+            HumanMessagePlaceholder(variable_name="history")
         ])
 
         planner_message = planner_prompt.format_messages(
-            design_template=get_design_template(openbridge_example),
-            input=input
+            design_template=get_design_template(
+                cwd=state.cwd,
+                file_list=os.listdir(state.cwd),
+                prev_spec={},
+                ),
+            input=input,
+            history=state.input[:-1] if len(state.input) > 1 else [],
         )
 
         planner = await get_model(
@@ -161,7 +102,11 @@ async def get_plan_step():
 async def get_execution_agent(tools: List[Any]):
     async def execute_step(state: AgentState) -> dict:
         app_plan = state.app_plan
-        design_template = get_design_template(openbridge_example)
+        design_template = get_design_template(
+                cwd=state.cwd,
+                file_list=os.listdir(state.cwd),
+                prev_spec={},
+                ),
         cwd = state.cwd
         model_name = state.model_name
         test_mode = state.test
@@ -249,7 +194,11 @@ async def get_replan_step():
         
         replanner_message = replanner_prompt.format_messages(
             input=input_content,
-            design_template=get_design_template(openbridge_example),
+                design_template=get_design_template(
+                cwd=state.cwd,
+                file_list=os.listdir(state.cwd),
+                prev_spec={},
+                ),
             app_plan=original_plan,
             past_steps=past_steps_formatted
         )
