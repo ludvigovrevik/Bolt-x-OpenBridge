@@ -36,7 +36,11 @@ from langchain_core.prompts import ChatPromptTemplate
 from .prompts.artifact_prompt import get_prompt
 from .load_model import load_model
 #from .graph import create_agent_graph, AgentState
-from .graph_demo import create_agent_graph, AgentState
+from .graph_demo import (
+    AgentState as ReasoningAgentState,
+    create_reasoning_agent_graph,
+    )
+from .graph import create_agent_graph, AgentState
 from .prompt import openbridge_example
 #from .prompt import get_prompt
 import logging # Add logging import
@@ -93,20 +97,58 @@ class MCPAgent:
         self.prompt = None
         self.graph = None
         self.checkpointer = MemorySaver()
-
-    def create_prompt(self, cwd: str) -> ChatPromptTemplate:
-        return [SystemMessage(content=get_prompt(cwd, self.tools))]
+        self.reasoning_agent = None
+        self.initialized = False
+    
+    async def set_agent_type(self, reasoning: bool = False):
+        """Set the agent type and reinitialize the graph if needed"""
+        if self.reasoning_agent == reasoning and self.initialized:
+            # No change needed
+            logger.info(f"Agent already set to {'reasoning' if reasoning else 'standard'} type")
+            return
+            
+        logger.info(f"Changing agent type from {'reasoning' if self.reasoning_agent else 'standard'} to {'reasoning' if reasoning else 'standard'}")
+        self.reasoning_agent = reasoning
+        
+        # Only rebuild graph if we've already initialized
+        if self.initialized and self.tools:
+            logger.info(f"Rebuilding graph for {'reasoning' if reasoning else 'standard'} agent")
+            
+            if self.reasoning_agent:
+                self.graph = await create_reasoning_agent_graph(
+                    self.tools,
+                    self.checkpointer,
+                )
+            else:
+                self.graph = create_agent_graph(
+                    self.tools,
+                    self.checkpointer
+                )
+            return True
+        return False
 
     async def initialize(self):
         self.tools, self.cleanup_func = await convert_mcp_to_langchain_tools(self.mcp_servers)
-        # Remove the nested initialize function and create the graph directly
+        
         if self.tools:
-            self.graph = await create_agent_graph(
-                self.tools,
-                self.checkpointer
-            )
+            print("MCP tools loaded successfully")
+            self.initialized = True  # Set flag to True after successful initialization
+            if self.reasoning_agent:
+                self.graph = await create_reasoning_agent_graph(
+                    self.tools,
+                    self.checkpointer,
+                )
+            else:
+                self.graph = create_agent_graph(
+                    self.tools,
+                    self.checkpointer
+                )
+        
         else:
             raise Exception("No tools were loaded from MCP servers")
+
+    def create_prompt(self, cwd: str) -> ChatPromptTemplate:
+        return [SystemMessage(content=get_prompt(cwd, self.tools))]
 
     # Add output formatting middleware
     async def format_response(self, content): # Removed type hint for flexibility
@@ -119,13 +161,22 @@ class MCPAgent:
 
     async def astream_events(self, input: List[BaseMessage], config: dict):
         # Convert input messages to AgentState format
-        initial_state = AgentState(
-            cwd=os.getcwd(),
-            model_name=self.llm.model_name,
-            input=input,
-            #design_template=get_design_template(openbridge_example),
-        )
-
+        if self.reasoning_agent:
+            # Use the reasoning agent graph if available
+            initial_state = ReasoningAgentState(
+                cwd=os.getcwd(),
+                model_name=self.llm.model_name,
+                input=input,
+            )
+            print(f"Using reasoning agent graph")
+        else:
+            # Use the standard agent graph
+            initial_state = AgentState(
+                cwd=os.getcwd(),
+                model_name=self.llm.model_name,
+                messages=input,
+            )
+            print(f"Using standard agent graph")
         # Use proper input format for the graph
         async for event in self.graph.astream_events(
             initial_state,
@@ -136,6 +187,19 @@ class MCPAgent:
                 chunk = event["data"]["chunk"]
                 chunk.content = await self.format_response(chunk.content)
                 yield event
+
+    async def cleanup(self):
+        """Clean up MCP servers and other resources."""
+        if self.cleanup_func:
+            try:
+                await self.cleanup_func()
+                print("MCP tools cleanup completed successfully")
+            except Exception as e:
+                print(f"Error during MCP tools cleanup: {e}")
+        else:
+            print("No cleanup function available")
+        # Reset initialized state
+        self.initialized = False
 
 app = FastAPI()
 
@@ -159,6 +223,7 @@ class ChatRequest(BaseModel):
     messages: List[ChatMessage] # Use the new ChatMessage model
     thread_id: str = "default"
     stream: bool = True
+    use_reasoning: bool = True
 
 @app.on_event("startup")
 async def startup_event():
@@ -180,6 +245,7 @@ async def shutdown_event():
 async def chat_endpoint(request: ChatRequest):
     logger.info("--- Entering chat_endpoint ---") # Log entry
     # Convert request messages to BaseMessage instances
+    await app.state.agent.set_agent_type(reasoning=request.use_reasoning)
     try:
         langchain_messages: List[BaseMessage] = [] # Renamed and typed for clarity
         num_messages = len(request.messages)
