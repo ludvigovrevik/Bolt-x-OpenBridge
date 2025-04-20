@@ -329,7 +329,6 @@ openbridge_example = """
 
 def get_prompt(cwd: str = '.', 
                tools: list = [],
-               openbridge_example: str = openbridge_example,
                ) -> str:
     tools_text_list = [f"- {tool.name}: {tool.description}" for tool in tools]
     # Join the list into a single multi-line string

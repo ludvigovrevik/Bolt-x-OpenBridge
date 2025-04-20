@@ -1,30 +1,18 @@
-# graph.py
-from typing import TypedDict, Annotated, Union, Sequence, List, Any
+from typing import TypedDict, Annotated, Union, Sequence, List, Any, Optional, Dict
 from langchain_core.agents import AgentAction, AgentFinish
-from langchain_core.messages import BaseMessage, ToolMessage, AIMessage, SystemMessage
+from langchain_core.messages import BaseMessage, ToolMessage, AIMessage, SystemMessage, HumanMessage
 from langgraph.graph import StateGraph, END
 from .load_model import load_model
 import json
 import operator
-# Removed logging import
 from langgraph.prebuilt import ToolNode
-from langchain_core.messages import SystemMessage, AIMessage, ToolMessage, HumanMessage, BaseMessage
 from langchain_core.runnables import RunnableConfig, RunnableLambda
-from langchain_core.agents import AgentAction
 from pydantic import BaseModel, Field
-from .prompt import get_prompt, openbridge_example
-from langgraph.prebuilt import create_react_agent
-from .prompts.designer_prompt import get_designer_prompt
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 import logging
-from typing import List, Dict, Any, Optional, Tuple
-import json
-import logging
-from langgraph.graph import StateGraph, END
-from langgraph.prebuilt import ToolNode, tools_condition
-from langchain_core.messages import SystemMessage, AIMessage, ToolMessage
-from langchain_core.runnables import RunnableConfig, RunnableLambda
-from langchain_core.agents import AgentAction
+import asyncio
+
+# Import the test framework
+from .test.test_framework import TestRunner
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("agent_graph")
@@ -35,28 +23,76 @@ class AgentState(BaseModel):
     messages: Annotated[Sequence[BaseMessage], operator.add]
     agent_outcome: Union[AgentAction, AgentFinish, None] = None
     return_direct: bool = False
-    intermediate_steps: Annotated[list[tuple[AgentAction, str]], operator.add]  = Field(default_factory=list)
-    model_name : str = "gpt-4.1"  # Default model name
+    intermediate_steps: Annotated[list[tuple[AgentAction, str]], operator.add] = Field(default_factory=list)
+    model_name: str = "gpt-4.1"  # Default model name
+    test: bool = False  # Flag to indicate if we're in test mode
+    test_responses: Optional[List[Dict[str, Any]]] = None  # Predefined responses for testing
+    system_prompt: Optional[str] = None  # Custom system prompt
+    design_template: Optional[str] = None  # Design template as human message
 
     class Config:
         arbitrary_types_allowed = True
 
 
-def create_agent_graph(tools, checkpointer=None):
-    """Create a more efficient LangGraph REACT agent with the latest features."""
+def create_agent_graph(
+    tools, 
+    system_prompt=None, 
+    design_template=None,
+    checkpointer=None
+):
+    """Create an async LangGraph REACT agent with customizable prompts and testing capabilities.
+    
+    Args:
+        tools: List of available tools
+        system_prompt: Optional custom system prompt for formatting instructions
+        design_template: Optional design template as a human message
+        checkpointer: Optional checkpointer for state persistence
+        
+    Returns:
+        Compiled async StateGraph for the agent
+    """
     logger.info(f"Creating agent graph with {len(tools)} tools")
 
     @RunnableLambda
     async def call_model(state: AgentState, config: RunnableConfig):
         """Call the LLM with the current conversation state."""
         logger.info(f"Calling model {state.model_name} with {len(state.messages)} messages")
-        system_message = SystemMessage(content=get_prompt(
+        
+        # Use custom system prompt if provided in state, fall back to parameter, then default
+        # Import here to avoid circular imports
+        from .prompt import get_prompt
+        system_content = get_prompt(
             cwd=state.cwd,
             tools=tools,
-            openbridge_example=openbridge_example,
-        ))
-        inputs = [system_message] + state.messages
-        llm = load_model(model_name=state.model_name, tools=tools)
+        )
+        
+        system_message = SystemMessage(content=system_content)
+        
+        # Initialize message list with system message
+        inputs = [system_message]
+        
+        # Import designer prompt if needed
+        from .prompts.designer_prompt import get_designer_prompt
+        design_template = get_designer_prompt(
+            cwd=state.cwd,
+            file_list=[],
+            prev_spec={},
+        )
+        design_msg = HumanMessage(content=design_template)
+        
+        inputs.append(design_msg)
+    
+        # Add existing conversation messages
+        inputs.extend(state.messages)
+        
+        # If in test mode, use mock model instead of actual LLM
+        if state.test and state.test_responses:
+            from .test.test_framework import MockModel
+            llm = MockModel(state.test_responses)
+            logger.info("Using mock model for testing")
+        else:
+            llm = load_model(model_name=state.model_name, tools=tools)
+            
         response = await llm.ainvoke(inputs, config=config)
         
         # Return updated state with the response
@@ -85,8 +121,16 @@ def create_agent_graph(tools, checkpointer=None):
             ),
         )
         
-        # Execute the tool
-        result = await tool_node.ainvoke(state)
+        # If in test mode and we have a mock tool response, use that instead
+        if state.test and hasattr(state, 'mock_tool_responses') and tool_name in state.mock_tool_responses:
+            # Create a mock tool message
+            mock_result = state.mock_tool_responses[tool_name]
+            tool_message = ToolMessage(content=mock_result, name=tool_name)
+            result = {"messages": state.messages + [tool_message]}
+            logger.info(f"Using mock tool response for {tool_name}")
+        else:
+            # Execute the tool normally
+            result = await tool_node.ainvoke(state)
         
         # Create the agent action record
         agent_action = AgentAction(
@@ -152,3 +196,42 @@ def create_agent_graph(tools, checkpointer=None):
     
     logger.info("Compiling graph without checkpointer")
     return workflow.compile()
+
+
+async def run_test_suite(test_suite_name="default"):
+    """Run a test suite through the agent graph.
+    
+    Args:
+        test_suite_name: Name of the test suite to run
+        
+    Returns:
+        Test results summary
+    """
+    from .test.test_framework import SAMPLE_TEST_SUITE
+    
+    # Import custom test suites if available
+    try:
+        from .test.test_suites import TEST_SUITES
+        test_suite = TEST_SUITES.get(test_suite_name, SAMPLE_TEST_SUITE)
+    except ImportError:
+        logger.warning("No custom test suites found, using sample test suite")
+        test_suite = SAMPLE_TEST_SUITE
+    
+    # Import tools
+    from .tools import get_tools
+    tools = get_tools()
+    
+    # Create agent graph
+    agent_graph = await create_agent_graph(tools)
+    
+    # Initialize test runner
+    test_runner = TestRunner(agent_graph)
+    
+    # Run tests
+    logger.info(f"Running test suite: {test_suite_name}")
+    results = await test_runner.run_test_suite(test_suite)
+    
+    # Log results
+    logger.info(f"Test results: {results['successful']}/{results['total']} tests passed")
+    
+    return results
