@@ -1,4 +1,3 @@
-# graph.py
 from typing import TypedDict, Annotated, Union, Sequence
 from langchain_core.agents import AgentAction, AgentFinish
 from langchain_core.messages import BaseMessage, ToolMessage, AIMessage, SystemMessage
@@ -7,10 +6,11 @@ from langgraph.graph import StateGraph, END
 from .load_model import load_model
 import json
 import operator
-# Removed logging import
+from app.retriever.retriever import component_info_tool  # Import the new tool
 from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, Field
 from .prompt import get_prompt
+from .prompt import get_test_prompt
 
 class AgentState(BaseModel):
     """State of the agent."""
@@ -19,24 +19,20 @@ class AgentState(BaseModel):
     agent_outcome: Union[AgentAction, AgentFinish, None] = None
     return_direct: bool = False
     intermediate_steps: Annotated[list[tuple[AgentAction, str]], operator.add]  = Field(default_factory=list)
-    model_name : str = "gpt-4.1"  # Default model name
+    model_name : str = "gpt-4.1"  
 
 def create_agent_graph(tools, checkpointer=None):
-    # Define nodes
-    # Removed logging configuration
+    tools.append(component_info_tool)  # Add the new tool to the tools list
 
     async def call_model(state: AgentState, config: RunnableConfig):
-        # Removed logging
         # Use the provided prompt template
-        system_message = SystemMessage(content=get_prompt(
+        system_message = SystemMessage(content=get_test_prompt(
             cwd=state.cwd,
             tools=tools,
             ))
         inputs = [system_message] + state.messages
-        # Removed logging
         llm = load_model(model_name=state.model_name, tools=tools)
         response = await llm.ainvoke(inputs, config=config)
-        # Removed logging
         return {"messages": [response]}
 
     # Define workflow
@@ -49,13 +45,9 @@ def create_agent_graph(tools, checkpointer=None):
 
     # Conditional edges
     def should_continue(state: AgentState):
-        # Removed logging
         last_msg = state.messages[-1]
-        # Removed logging
         if isinstance(last_msg, AIMessage) and last_msg.tool_calls:
-            # Removed logging
             return "continue"
-        # Removed logging
         return "end"
 
     workflow.add_conditional_edges(

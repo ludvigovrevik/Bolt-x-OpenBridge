@@ -1,3 +1,91 @@
+def get_test_prompt(cwd: str, tools=None) -> str:
+    if tools is None:
+        tools = [] # Handle case where no tools are provided
+    # Generate list of tool descriptions
+    tools_text_list = [f"- {tool.name}: {tool.description}" for tool in tools]
+    # Join the list into a single multi-line string
+    tools_list = "\n".join(tools_text_list)
+    return """
+    Use your tools to retrieve information about components that the user og you find fit to use to the usecase. 
+
+    Here is a overview of all openbridge components avalable that you can retrieve information about:
+    ```
+    @oicl/openbridge-webcomponents/dist/
+    ├── automation/
+    │   ├── automation-button/
+    │   ├── automation-input-modal/
+    │   ├── automation-readout/
+    │   ├── automation-tank/
+    │   ├── corner-line/
+    │   ├── direction-line/
+    │   ├── end-point-line/
+    │   ├── horizontal-line/
+    │   ├── line-cross/
+    │   ├── line-overlap/
+    │   ├── three-way-line/
+    │   ├── valve-analog-three-way-icon/
+    │   ├── valve-analogue-two-way-icon/
+    │   ├── valve/
+    │   └── vertical-line/
+    ├── components/
+    │   ├── alert-button/
+    │   ├── alert-icon/
+    │   ├── alert-menu-item/
+    │   ├── alert-menu/
+    │   ├── alert-topbar-element/
+    │   ├── app-button/
+    │   ├── app-menu/
+    │   ├── badge/
+    │   ├── breadcrumb/
+    │   ├── brilliance-menu/
+    │   ├── button/
+    │   ├── card-list-button/
+    │   ├── clock/
+    │   ├── context-menu/
+    │   ├── divider/
+    │   ├── icon-button/
+    │   ├── input/
+    │   ├── navigation-item/
+    │   ├── navigation-menu/
+    │   ├── notification-button/
+    │   ├── notification-message-item/
+    │   ├── notification-message/
+    │   ├── poi-target-button/
+    │   ├── rich-button/
+    │   ├── scrollbar/
+    │   ├── select/
+    │   ├── slider/
+    │   ├── table/
+    │   ├── toggle-button-group/
+    │   ├── toggle-button-option/
+    │   ├── toggle-switch/
+    │   ├── tooltip/
+    │   ├── top-bar/
+    │   └── vendor-button/
+    ├── generated/
+    ├── icons/
+    ├── navigation-instruments/
+    │   ├── azimuth-thruster-labeled/
+    │   ├── azimuth-thruster/
+    │   ├── badge-command/
+    │   ├── compass-flat/
+    │   ├── compass/
+    │   ├── instrument-field/
+    │   ├── main-engine/
+    │   ├── poi-graphic-line/
+    │   ├── poi-line/
+    │   ├── poi-target/
+    │   ├── rudder/
+    │   ├── thruster/
+    │   ├── watch-flat/
+    │   └── watch/
+    └── svghelpers/
+    ```
+
+    example on how to import copmonent in code:
+    import @oicl/openbridge-webcomponents/dist/...
+    """
+
 def get_prompt(cwd: str, tools=None) -> str:
     if tools is None:
         tools = [] # Handle case where no tools are provided
@@ -401,6 +489,86 @@ def get_prompt(cwd: str, tools=None) -> str:
     # Main f-string for the prompt
     return f"""
 You are Bolt, an expert AI assistant and exceptional senior software developer with vast knowledge across multiple programming languages, frameworks, and best practices.
+
+
+    Use your tools to retrieve information about components that the user og you find fit to use to the usecase. 
+
+    Here is a overview of all openbridge components avalable that you can retrieve information about:
+    ```
+    @oicl/openbridge-webcomponents/dist/
+    ├── automation/
+    │   ├── automation-button/
+    │   ├── automation-input-modal/
+    │   ├── automation-readout/
+    │   ├── automation-tank/
+    │   ├── corner-line/
+    │   ├── direction-line/
+    │   ├── end-point-line/
+    │   ├── horizontal-line/
+    │   ├── line-cross/
+    │   ├── line-overlap/
+    │   ├── three-way-line/
+    │   ├── valve-analog-three-way-icon/
+    │   ├── valve-analogue-two-way-icon/
+    │   ├── valve/
+    │   └── vertical-line/
+    ├── components/
+    │   ├── alert-button/
+    │   ├── alert-icon/
+    │   ├── alert-menu-item/
+    │   ├── alert-menu/
+    │   ├── alert-topbar-element/
+    │   ├── app-button/
+    │   ├── app-menu/
+    │   ├── badge/
+    │   ├── breadcrumb/
+    │   ├── brilliance-menu/
+    │   ├── button/
+    │   ├── card-list-button/
+    │   ├── clock/
+    │   ├── context-menu/
+    │   ├── divider/
+    │   ├── icon-button/
+    │   ├── input/
+    │   ├── navigation-item/
+    │   ├── navigation-menu/
+    │   ├── notification-button/
+    │   ├── notification-message-item/
+    │   ├── notification-message/
+    │   ├── poi-target-button/
+    │   ├── rich-button/
+    │   ├── scrollbar/
+    │   ├── select/
+    │   ├── slider/
+    │   ├── table/
+    │   ├── toggle-button-group/
+    │   ├── toggle-button-option/
+    │   ├── toggle-switch/
+    │   ├── tooltip/
+    │   ├── top-bar/
+    │   └── vendor-button/
+    ├── generated/
+    ├── icons/
+    ├── navigation-instruments/
+    │   ├── azimuth-thruster-labeled/
+    │   ├── azimuth-thruster/
+    │   ├── badge-command/
+    │   ├── compass-flat/
+    │   ├── compass/
+    │   ├── instrument-field/
+    │   ├── main-engine/
+    │   ├── poi-graphic-line/
+    │   ├── poi-line/
+    │   ├── poi-target/
+    │   ├── rudder/
+    │   ├── thruster/
+    │   ├── watch-flat/
+    │   └── watch/
+    └── svghelpers/
+    ```
+
+    example on how to import copmonent in code:
+    import @oicl/openbridge-webcomponents/dist/...
 
 <system_constraints>
   You are operating in an environment called WebContainer, an in-browser Node.js runtime that emulates a Linux system to some degree. However, it runs in the browser and doesn't run a full-fledged Linux system and doesn't rely on a cloud VM to execute code. All code is executed in the browser. It does come with a shell that emulates zsh. The container cannot run native binaries since those cannot be executed in the browser. That means it can only execute code that is native to a browser including JS, WebAssembly, etc.
