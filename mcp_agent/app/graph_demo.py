@@ -76,7 +76,7 @@ async def get_plan_step():
         ])
 
         planner_message = planner_prompt.format_messages(
-            design_template=get_design_template(
+            design_template=get_designer_prompt(
                 cwd=state.cwd,
                 file_list=os.listdir(state.cwd),
                 prev_spec={},
@@ -102,7 +102,7 @@ async def get_plan_step():
 async def get_execution_agent(tools: List[Any]):
     async def execute_step(state: AgentState) -> dict:
         app_plan = state.app_plan
-        design_template = get_design_template(
+        design_template = get_designer_prompt(
                 cwd=state.cwd,
                 file_list=os.listdir(state.cwd),
                 prev_spec={},
@@ -194,7 +194,7 @@ async def get_replan_step():
         
         replanner_message = replanner_prompt.format_messages(
             input=input_content,
-                design_template=get_design_template(
+                design_template=get_designer_prompt(
                 cwd=state.cwd,
                 file_list=os.listdir(state.cwd),
                 prev_spec={},
