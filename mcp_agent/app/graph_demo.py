@@ -12,7 +12,7 @@ from langgraph.prebuilt import create_react_agent
 import os
 from langchain_core.messages import BaseMessage, HumanMessage
 from langchain import hub
-from langchain_core.prompts import ChatPromptTemplate, HumanMessagePlaceholder
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 
 # Define the state as a Pydantic model for dot walking
@@ -72,7 +72,7 @@ async def get_plan_step():
     The plan should be comprehensive and cover all aspects of the app.
     Consider project structure, dependencies, components, styling, and functionality."""),
             ("user", "Design Template: {design_template}\n\nObjective: {input}"),
-            HumanMessagePlaceholder(variable_name="history")
+            MessagesPlaceholder(variable_name="history")
         ])
 
         planner_message = planner_prompt.format_messages(
