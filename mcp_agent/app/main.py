@@ -41,7 +41,6 @@ from .graph_demo import (
     create_agent_graph as create_reasoning_agent_graph,
     )
 from .graph import create_agent_graph, AgentState
-from .prompt import openbridge_example
 #from .prompt import get_prompt
 import logging # Add logging import
 

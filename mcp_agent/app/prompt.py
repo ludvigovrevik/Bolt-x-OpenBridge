@@ -1,4 +1,102 @@
-openbridge_example = """
+def get_test_prompt(cwd: str, tools=None) -> str:
+    if tools is None:
+        tools = [] # Handle case where no tools are provided
+    # Generate list of tool descriptions
+    tools_text_list = [f"- {tool.name}: {tool.description}" for tool in tools]
+    # Join the list into a single multi-line string
+    tools_list = "\n".join(tools_text_list)
+    return """
+    Use your tools to retrieve information about components that the user og you find fit to use to the usecase. 
+
+    Here is a overview of all openbridge components avalable that you can retrieve information about:
+    ```
+    @oicl/openbridge-webcomponents/dist/
+    ├── automation/
+    │   ├── automation-button/
+    │   ├── automation-input-modal/
+    │   ├── automation-readout/
+    │   ├── automation-tank/
+    │   ├── corner-line/
+    │   ├── direction-line/
+    │   ├── end-point-line/
+    │   ├── horizontal-line/
+    │   ├── line-cross/
+    │   ├── line-overlap/
+    │   ├── three-way-line/
+    │   ├── valve-analog-three-way-icon/
+    │   ├── valve-analogue-two-way-icon/
+    │   ├── valve/
+    │   └── vertical-line/
+    ├── components/
+    │   ├── alert-button/
+    │   ├── alert-icon/
+    │   ├── alert-menu-item/
+    │   ├── alert-menu/
+    │   ├── alert-topbar-element/
+    │   ├── app-button/
+    │   ├── app-menu/
+    │   ├── badge/
+    │   ├── breadcrumb/
+    │   ├── brilliance-menu/
+    │   ├── button/
+    │   ├── card-list-button/
+    │   ├── clock/
+    │   ├── context-menu/
+    │   ├── divider/
+    │   ├── icon-button/
+    │   ├── input/
+    │   ├── navigation-item/
+    │   ├── navigation-menu/
+    │   ├── notification-button/
+    │   ├── notification-message-item/
+    │   ├── notification-message/
+    │   ├── poi-target-button/
+    │   ├── rich-button/
+    │   ├── scrollbar/
+    │   ├── select/
+    │   ├── slider/
+    │   ├── table/
+    │   ├── toggle-button-group/
+    │   ├── toggle-button-option/
+    │   ├── toggle-switch/
+    │   ├── tooltip/
+    │   ├── top-bar/
+    │   └── vendor-button/
+    ├── generated/
+    ├── icons/
+    ├── navigation-instruments/
+    │   ├── azimuth-thruster-labeled/
+    │   ├── azimuth-thruster/
+    │   ├── badge-command/
+    │   ├── compass-flat/
+    │   ├── compass/
+    │   ├── instrument-field/
+    │   ├── main-engine/
+    │   ├── poi-graphic-line/
+    │   ├── poi-line/
+    │   ├── poi-target/
+    │   ├── rudder/
+    │   ├── thruster/
+    │   ├── watch-flat/
+    │   └── watch/
+    └── svghelpers/
+    ```
+
+    example on how to import copmonent in code:
+    import @oicl/openbridge-webcomponents/dist/...
+    """
+
+def get_prompt(cwd: str, tools=None) -> str:
+    if tools is None:
+        tools = [] # Handle case where no tools are provided
+    # Generate list of tool descriptions
+    tools_text_list = [f"- {tool.name}: {tool.description}" for tool in tools]
+    # Join the list into a single multi-line string
+    tools_list = "\n".join(tools_text_list)
+
+    # Define the complex example block separately to avoid f-string parsing issues
+    # Note: Use single braces {} inside this block as it's not an f-string itself
+    openbridge_example = """
     4. **Register and use the web components:**
 
        **Example 1: General Component Usage**
@@ -325,18 +423,7 @@ openbridge_example = """
        - **Component Imports:** Ensure you import the specific `.js` files for all used automation components (e.g., `automation-tank.js`, `vertical-line.js`, `valve-analog-three-way-icon.js`, etc.) and any icons (e.g., `obi-08-pump-on-horisontal.js`).
        - **Properties:** Set component properties directly via JavaScript (e.g., `tankElement.value = 50; tankElement.medium = 'water';`) or HTML attributes where applicable (e.g., `<obc-vertical-line length="5">`). Remember attribute names are lowercase.
        - **Logic:** Implement dynamic behavior (like tank filling/emptying, line medium changes) using plain JavaScript, updating component properties based on simulation state.
-""" 
-
-def get_prompt(cwd: str = '.', 
-               tools: list = [],
-               ) -> str:
-    tools_text_list = [f"- {tool.name}: {tool.description}" for tool in tools]
-    # Join the list into a single multi-line string
-    tools_list = "\n".join(tools_text_list)
-
-    # Define the complex example block separately to avoid f-string parsing issues
-    # Note: Use single braces {} inside this block as it's not an f-string itself
-  
+"""
 
     # Main f-string for the prompt
     return f"""
@@ -481,50 +568,6 @@ You are Bolt, an expert AI assistant and exceptional senior software developer w
 <message_formatting_info>
   You can make the output pretty by using only the following available HTML elements: <p>, <pre>, <code>, <ul>, <ol>, <li>, <strong>, <em>, <br>
 </message_formatting_info>
-
-<diff_spec>
-  For user-made file modifications, a `<modifications>` section will appear at the start of the user message. It will contain either `<diff>` or `<file>` elements for each modified file:
-
-    - `<diff path="/some/file/path.ext">`: Contains GNU unified diff format changes
-    - `<file path="/some/file/path.ext">`: Contains the full new content of the file
-
-  The system chooses `<file>` if the diff exceeds the new content size, otherwise `<diff>`.
-
-  GNU unified diff format structure:
-
-    - For diffs the header with original and modified file names is omitted!
-    - Changed sections start with @@ -X,Y +A,B @@ where:
-      - X: Original file starting line
-      - Y: Original file line count
-      - A: Modified file starting line
-      - B: Modified file line count
-    - (-) lines: Removed from original
-    - (+) lines: Added in modified version
-    - Unmarked lines: Unchanged context
-
-  Example:
-
-  <modifications>
-    <diff path="/home/project/src/main.js">
-      @@ -2,7 +2,10 @@
-        return a + b;
-      }}
-
-      -console.log('Hello, World!');
-      +console.log('Hello, Bolt!');
-      +
-      function greet() {{
-      -  return 'Greetings!';
-      +  return 'Greetings!!';
-      }}
-      +
-      +console.log('The End');
-    </diff>
-    <file path="/home/project/package.json">
-      // full file content here
-    </file>
-  </modifications>
-</diff_spec>
 
 <reasoning_and_planning_guidelines>
   **CRITICAL: Before generating any code artifact, you MUST perform a detailed reasoning and planning step.** This involves:

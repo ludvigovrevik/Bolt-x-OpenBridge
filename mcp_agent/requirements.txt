@@ -16,6 +16,7 @@ dnspython==2.7.0
 e==1.4.5
 email_validator==2.2.0
 fast-agent-mcp==0.2.10
+faiss-cpu>=1.7.4
 fastapi==0.115.12
 fastapi-cli==0.0.7
 filetype==1.2.0

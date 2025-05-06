@@ -5,6 +5,7 @@ from langgraph.graph import StateGraph, END
 from .load_model import load_model
 import json
 import operator
+from app.retriever.retriever import component_info_tool  # Import the new tool
 from langgraph.prebuilt import ToolNode
 from langchain_core.runnables import RunnableConfig, RunnableLambda
 from pydantic import BaseModel, Field
@@ -16,6 +17,7 @@ from .test.test_framework import TestRunner
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("agent_graph")
+from .prompt import get_test_prompt
 
 class AgentState(BaseModel):
     """State of the agent."""
@@ -61,7 +63,8 @@ def create_agent_graph(
         # Use custom system prompt if provided in state, fall back to parameter, then default
         # Import here to avoid circular imports
         from .prompt import get_prompt
-        system_content = get_prompt(
+        from .prompt import get_test_prompt
+        system_content = get_test_prompt(
             cwd=state.cwd,
             tools=tools,
         )
