@@ -13,49 +13,55 @@ logging.basicConfig(level=logging.INFO)
 load_dotenv()
 
 
-def load_model(model_name, tools=None, prompt=None, parser=False):
+def load_model(model_name, 
+               tools=None, 
+               prompt=None, 
+               parser=False,
+               test: bool = False,
+               ) -> object:
     """Load the model dynamically based on the parameter."""
-    # Initialize the model based on the model_name
-    if 'gemini' in model_name:
-        model = ChatGoogleGenerativeAI(
-            model=model_name,
-            temperature=0,
-            max_tokens=None,  # Limit output tokens
-            timeout=60,
-            max_retries=2,
-            api_key=os.getenv('GOOGLE_API_KEY')
-            )
-    elif 'claude' in model_name:
-        model = ChatAnthropic(
-            model=model_name,
-            temperature=0,
-            max_tokens_to_sample=8192,
-            streaming=True,
-            anthropic_api_key=os.getenv('ANTHROPIC_API_KEY')
-        )
+    if test:
+        # For testing purposes, use a mock model
+        from .mock_llm import MockStreamingLLM
+        return MockStreamingLLM()
     else:
-        model = ChatOpenAI(
-            model=model_name,
-            temperature=0,
-            max_tokens=None,  # Limit output tokens
-            streaming=True,
-            api_key=os.getenv('OPENAI_API_KEY')
+        # Initialize the model based on the model_name
+        if 'gemini' in model_name:
+            model = ChatGoogleGenerativeAI(
+                model=model_name,
+                temperature=0,
+                max_tokens=None,  # Limit output tokens
+                timeout=60,
+                max_retries=2,
+                api_key=os.getenv('GOOGLE_API_KEY')
+                )
+        elif 'claude' in model_name:
+            model = ChatAnthropic(
+                model=model_name,
+                temperature=0,
+                max_tokens_to_sample=8192,
+                streaming=True,
+                anthropic_api_key=os.getenv('ANTHROPIC_API_KEY')
             )
+        else:
+            model = ChatOpenAI(
+                model=model_name,
+                temperature=0,
+                max_tokens=None,  # Limit output tokens
+                streaming=True,
+                api_key=os.getenv('OPENAI_API_KEY')
+                )
 
-    # Bind tools if provided
-    if tools:
-        model = model.bind_tools(tools)
+        # Bind tools if provided
+        if tools:
+            model = model.bind_tools(tools)
 
-    if prompt:
-        chain = prompt | model
         if parser:
-            model = chain.with_structured_output(schema=parser)
-        
-        return chain
+            model = model.with_structured_output(schema=parser)
+            
+            if prompt:
+                chain = model | prompt
+                return chain
 
-    # Create a chain based on the parser parameter
-    if parser:
-        model = model.with_structured_output(schema=parser)
-
-    # Default chain without parser
-    return model
+        # Default chain without parser
+        return model

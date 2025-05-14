@@ -12,14 +12,12 @@ import logging
 import asyncio
 from langgraph.checkpoint.memory import MemorySaver
 # Import designer prompt if needed
-from .prompts.designer_prompt import get_designer_prompt
 
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("agent_graph")
 
 from enum import Enum
-from typing import Literal, List, Optional, Union
 from pydantic import BaseModel, Field
 
 
@@ -71,10 +69,9 @@ class AgentState(BaseModel):
         arbitrary_types_allowed = True
 
 def create_agent_graph(
-    tools=[], 
+    tools: List = [], 
     system_prompt=None, 
     design_template=None,
-    checkpointer=None
 ):
     """Create an async LangGraph REACT agent with customizable prompts and testing capabilities.
     
@@ -87,8 +84,9 @@ def create_agent_graph(
     Returns:
         Compiled async StateGraph for the agent
     """
-
-    logger.info(f"Creating agent graph with {len(tools)} tools")
+    if tools is None:
+        tools = []
+        logger.info(f"Creating agent graph with {len(tools)} tools")
 
     async def create_plan(state: AgentState):
         """Create a step-by-step plan for app creation."""
@@ -99,64 +97,7 @@ def create_agent_graph(
         planner_llm = load_model(model_name=state.model_name, tools=[], parser=None)
         structured_planner = planner_llm.with_structured_output(AppPlan)
         
-        system_prompt_designer = """
-You are Bolt Designer, an expert AI engineer.  
-Your job is to produce a complete plan for a browser‑based React app running in WebContainer.  
-A Pydantic AppPlan schema (with Framework, PlanStep and AppPlan definitions) will be injected at runtime—**you do not need to repeat or restate that schema**.
-
-<environment>
-  • Runs in WebContainer (in‑browser Node.js + zsh).  
-  • No native binaries or compilation (no g++, no pip, no native modules).  
-  • Python is available but limited to the standard library.  
-  • Git is unavailable.  
-  • All file creation/modification belongs in each step’s `file_outputs`—never via shell file ops.
-</environment>
-
-<init>
-  • Step 1 (“Initialize Vite React project”):
-    - commands: [`npm create vite@latest <app_name> -- --template react`]
-    - file_outputs: []
-</init>
-
-<dependencies>
-  • Collect every `npm install` (runtime & dev) into the top‑level `dependencies` array.
-</dependencies>
-
-<styling>
-  • One dedicated step for Tailwind:
-    - commands: [`npm install -D tailwindcss postcss autoprefixer`]
-    - file_outputs: [`tailwind.config.js`, `postcss.config.js`, `src/index.css`]
-</styling>
-
-<dev_server>
-  • The final step’s `commands` must be [`npm run dev`], and its `file_outputs` should be empty.
-</dev_server>
-
-<openbridge>
-  • If you plan to use OpenBridge components, list their `.js` files in `file_outputs`.  
-  • Always include a top‑bar and brilliance menu.  
-  • Use lowercase HTML attributes (`apptitle`, `pagename`, `showclock`, `showdimmingbutton`, `showappsbutton`).  
-  • Never import `icon-alert-bell-indicator-iec.js`.  
-  • Plan for a JS listener on `paletteChanged` to update `data-obc-theme`.  
-  • Ensure body background uses CSS var `--container-background-color`.
-</openbridge>
-
-<steps>
-  • Each PlanStep must supply:
-    1. `step_number` (integer, ascending)
-    2. `description` (human‑readable summary)
-    3. `file_outputs` (array of relative file paths)
-    4. `commands` (array of npm/Vite commands)
-    5. optional `rollback_commands` or `working_dir`
-  • One logical concern per step—no mixing.
-</steps>
-
-<note>
-  A valid AppPlan JSON object matching the injected schema will be produced automatically; focus only on *what* goes into each field, not *how* to format it.
-</note>
-"""
-
-
+        from .prompts.designer_prompt import system_prompt_designer
         # Add planning instructions to the messages with improved guidance
         planning_messages = [
                 SystemMessage(content=system_prompt_designer)
@@ -206,7 +147,8 @@ A Pydantic AppPlan schema (with Framework, PlanStep and AppPlan definitions) wil
                          tools=tools,
                          test=state.test_mode,
         )
-        from .prompt import get_prompt, get_new_prompt
+        from .prompt import get_prompt
+        from .prompts.creator_prompt import get_new_prompt
         from .prompt import get_test_prompt
         test_prompt = get_test_prompt(
             cwd=state.cwd,
@@ -216,7 +158,7 @@ A Pydantic AppPlan schema (with Framework, PlanStep and AppPlan definitions) wil
         
         inputs = [
             SystemMessage(content=get_new_prompt())
-            ] + state.messages
+            ] + plan_content
 
         response = await llm.ainvoke(input=inputs)
         print(f"Response: {response}")
