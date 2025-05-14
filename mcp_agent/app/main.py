@@ -63,7 +63,7 @@ class ChatRequest(BaseModel):
     messages: List[ChatMessage] # Use the new ChatMessage model
     thread_id: str = "default"
     stream: bool = True
-    use_reasoning: bool = True
+    use_reasoning: bool = False
 
 @app.on_event("startup")
 async def startup_event():

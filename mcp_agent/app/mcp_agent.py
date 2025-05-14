@@ -55,22 +55,22 @@ class MCPAgent:
         self.frontend = os.path.join(self.repo_root, "app")
         print(self.repo_root)
         self.mcp_servers = {
-            "filesystem": {
-                "command": "npx",
-                "args": [
-                    "-y",  # Crucial for non-interactive execution
-                    "@modelcontextprotocol/server-filesystem",
-                    os.path.expanduser(self.repo_root)  # Home directory as root
-                ],
-                "cwd": os.path.expanduser(self.repo_root)  # Explicit working directory
-            },
-            "mcp-figma": {
-                "command": "npx",
-                "args": [
-                    "-y",
-                    "mcp-figma"
-                ]
-            },
+            #"filesystem": {
+            #    "command": "npx",
+            #    "args": [
+            #        "-y",  # Crucial for non-interactive execution
+            #        "@modelcontextprotocol/server-filesystem",
+            #        os.path.expanduser(self.repo_root)  # Home directory as root
+            #    ],
+            #    "cwd": os.path.expanduser(self.repo_root)  # Explicit working directory
+            #},
+            #"mcp-figma": {
+            #    "command": "npx",
+            #    "args": [
+            #        "-y",
+            #        "mcp-figma"
+            #    ]
+            #},
 #             "sequential-thinking": {
 #                 "command": "npx",
 #                 "args": [
@@ -103,7 +103,7 @@ class MCPAgent:
         return self.reasoning_agent
 
     async def initialize(self):
-        #self.tools, self.cleanup_func = await convert_mcp_to_langchain_tools(self.mcp_servers)
+        self.tools, self.cleanup_func = await convert_mcp_to_langchain_tools(self.mcp_servers)
         
         if self.tools:
             print("MCP tools loaded successfully")

@@ -18,39 +18,49 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger("agent_graph")
 
 from enum import Enum
+from typing import List, Optional
 from pydantic import BaseModel, Field
 
-
-# 1. Enumerations for stronger typing and discoverability
+# Enum for Framework types
 class Framework(str, Enum):
     react = "react"
     vue = "vue"
     angular = "angular"
     svelte = "svelte"
 
+# Enhanced PlanStep model
 class PlanStep(BaseModel):
     step_number: int
     description: str
     file_outputs: List[str] = Field(
         default_factory=list,
-        description="List of file paths created or modified in this step; must start with project_dir/"
+        description="List of file paths created or modified in this step"
     )
     commands: List[str] = Field(
         default_factory=list,
-        description="Shell commands required for this step; must operate in project_dir"
+        description="Shell commands required for this step"
     )
-    rollback_commands: Optional[List[str]] = None
-    working_dir: Optional[str] = Field(
-        None, description="If set, commands are meant to run in this directory"
+    rollback_commands: Optional[List[str]] = Field(
+        None, description="Commands to undo this step if it fails"
+    )
+    is_final_step: Optional[bool] = Field(
+        ..., description="Marks the final step, ensuring proper sequence of actions"
     )
 
+# Global AppPlan model with improved structure for managing dependencies and steps
 class AppPlan(BaseModel):
     app_name: str
     framework: Framework
-    project_dir: str = Field(..., description="The folder name created in step 1")
     description: str
-    dependencies: List[str]
+    dependencies: List[str] = Field(
+        ..., description="Top-level npm packages to install, consolidated for efficiency"
+    )
     steps: List[PlanStep]
+
+    class Config:
+        min_anystr_length = 1  # Ensure all strings have a minimum length
+        anystr_strip_whitespace = True  # Strip unnecessary whitespace from string inputs
+
 
 class AgentState(BaseModel):
     """State of the agent."""
@@ -59,7 +69,7 @@ class AgentState(BaseModel):
     agent_outcome: Union[AgentAction, AgentFinish, None] = None
     return_direct: bool = False
     intermediate_steps: Annotated[list[tuple[AgentAction, str]], operator.add] = Field(default_factory=list)
-    model_name: str = "gpt-4.1-nano"  # Default model name
+    model_name: str = ""
     test_mode: bool = False  # Flag to indicate if we're in test mode
     test_responses: Optional[List[Dict[str, Any]]] = None  # Predefined responses for testing
     app_plan: Optional[AppPlan] = None  # App plan for the agent
@@ -148,7 +158,7 @@ def create_agent_graph(
                          test=state.test_mode,
         )
         from .prompt import get_prompt
-        from .prompts.creator_prompt import get_new_prompt
+        from .prompts.creator_prompt import get_creator_prompt
         from .prompt import get_test_prompt
         test_prompt = get_test_prompt(
             cwd=state.cwd,
@@ -157,7 +167,7 @@ def create_agent_graph(
         
         
         inputs = [
-            SystemMessage(content=get_new_prompt())
+            SystemMessage(content=get_creator_prompt())
             ] + plan_content
 
         response = await llm.ainvoke(input=inputs)
