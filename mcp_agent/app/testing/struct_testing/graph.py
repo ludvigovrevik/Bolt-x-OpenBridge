@@ -30,6 +30,78 @@ class Framework(str, Enum):
     angular = "angular"
     svelte = "svelte"
 
+
+class ActionType(str, Enum):
+    shell = "shell"
+    file = "file"
+    message = "message"
+
+
+# 2. Base action with a link back to the plan step for traceability
+class BaseAction(BaseModel):
+    type: ActionType
+    step_number: int = Field(..., description="Corresponding PlanStep.step_number")
+
+
+# 3. ShellAction: break out arguments for easier validation or introspection
+class ShellAction(BaseAction):
+    type: Literal[ActionType.shell]
+    command: str = Field(..., description="The full shell command to execute")
+    args: Optional[List[str]] = Field(
+        ..., description="Optional list of command-line arguments"
+    )
+
+
+# 4. FileAction: add an operation flag and support for file mode or encoding
+class FileOperation(str, Enum):
+    create = "create"
+    update = "update"
+
+
+class FileAction(BaseAction):
+    type: Literal[ActionType.file]
+    file_path: str = Field(..., description="Relative path to the file")
+    operation: FileOperation = Field(
+        ..., description="Whether this is a create or update operation"
+    )
+    content: str = Field(..., description="Full file contents")
+
+
+class MessageAction(BaseAction):
+    type: Literal[ActionType.message]
+    content: str = Field(..., description="The message content")
+
+
+# 6. BoltArtifact: track environment, version, and optional metadata
+class BoltArtifact(BaseModel):
+    type: Literal["artifact"]
+    id: str = Field(..., description="Unique identifier in kebab-case")
+    title: str = Field(..., description="Human-readable title")
+    project_dir: str = Field(..., description="Root folder created in first ShellAction")
+    framework: Framework = Field(..., description="Chosen application framework")
+    actions: List[Union[ShellAction, FileAction, MessageAction]]
+
+class BoltAction(BaseModel):
+    type: Literal["boltAction"]
+    step_number: int = Field(..., description="Corresponding PlanStep.step_number")
+    action: Union[ShellAction, FileAction, MessageAction] = Field(
+        ..., description="The action to be performed"
+    )
+
+#    environment: str = Field(
+#        "webcontainer",
+#        description="Target environment (e.g. webcontainer, node, etc.)"
+#    )
+#    version: Optional[str] = Field(
+#        ..., description="Optional version tag for this artifact"
+#    )
+#    metadata: Optional[dict] = Field(
+#        ..., description="Arbitrary additional metadata"
+#    )
+
+
+# 7. PlanStep: make file_outputs and commands required when present,
+#    and include an optional “rollback” command list for error handling
 class PlanStep(BaseModel):
     step_number: int
     description: str
@@ -66,12 +138,13 @@ class AgentState(BaseModel):
     test_responses: Optional[List[Dict[str, Any]]] = None  # Predefined responses for testing
     app_plan: Optional[AppPlan] = None  # App plan for the agent
     use_planner: bool = False  # Flag to indicate if we should use the planner
+    bolt_artifact: Optional[BoltArtifact] = None  # Bolt artifact to be created
 
     class Config:
         arbitrary_types_allowed = True
 
 def create_agent_graph(
-    tools=[], 
+    tools, 
     system_prompt=None, 
     design_template=None,
     checkpointer=None
@@ -87,7 +160,6 @@ def create_agent_graph(
     Returns:
         Compiled async StateGraph for the agent
     """
-
     logger.info(f"Creating agent graph with {len(tools)} tools")
 
     async def create_plan(state: AgentState):
@@ -100,62 +172,26 @@ def create_agent_graph(
         structured_planner = planner_llm.with_structured_output(AppPlan)
         
         system_prompt_designer = """
-You are Bolt Designer, an expert AI engineer.  
-Your job is to produce a complete plan for a browser‑based React app running in WebContainer.  
-A Pydantic AppPlan schema (with Framework, PlanStep and AppPlan definitions) will be injected at runtime—**you do not need to repeat or restate that schema**.
+You are the design agent. Produce a complete AppPlan for a browser‑based web app in a WebContainer.
 
-<environment>
-  • Runs in WebContainer (in‑browser Node.js + zsh).  
-  • No native binaries or compilation (no g++, no pip, no native modules).  
-  • Python is available but limited to the standard library.  
-  • Git is unavailable.  
-  • All file creation/modification belongs in each step’s `file_outputs`—never via shell file ops.
-</environment>
+For each atomic step:
+1. Describe exactly what you will do.
+2. List `file_outputs`: an array of file paths created or modified (no shell file commands).
+3. List `commands`: only web‑compatible npm/Vite commands.
 
-<init>
-  • Step 1 (“Initialize Vite React project”):
-    - commands: [`npm create vite@latest <app_name> -- --template react`]
-    - file_outputs: []
-</init>
+Hard requirements:
+- **No shell‑based file operations.** Do not propose `echo >`, `sed`, `touch`, `cat`, etc. File creation/editing belongs exclusively in `file_outputs`.
+- **Environment:** Browser WebContainer, no native binaries.
+- **Init:** `npm create vite@latest <app-name> -- --template react`.
+- **Dependencies:** Explicit `npm install` or `npm install -D tailwindcss postcss autoprefixer`.
+- **Styling:** Include Tailwind: add `tailwind.config.js`, `postcss.config.js`, and `src/index.css` (via `file_outputs`).
+- **Dev server:** Include final `npm run dev` command.
+- **Atomicity:** One step = one set of files + one set of commands. No mixing.
+- **Minimal files:** File contents are not written here; the creator agent will handle full content via FileActions.
+- **OpenBridge:** Note any OpenBridge component files in `file_outputs` if used.
 
-<dependencies>
-  • Collect every `npm install` (runtime & dev) into the top‑level `dependencies` array.
-</dependencies>
-
-<styling>
-  • One dedicated step for Tailwind:
-    - commands: [`npm install -D tailwindcss postcss autoprefixer`]
-    - file_outputs: [`tailwind.config.js`, `postcss.config.js`, `src/index.css`]
-</styling>
-
-<dev_server>
-  • The final step’s `commands` must be [`npm run dev`], and its `file_outputs` should be empty.
-</dev_server>
-
-<openbridge>
-  • If you plan to use OpenBridge components, list their `.js` files in `file_outputs`.  
-  • Always include a top‑bar and brilliance menu.  
-  • Use lowercase HTML attributes (`apptitle`, `pagename`, `showclock`, `showdimmingbutton`, `showappsbutton`).  
-  • Never import `icon-alert-bell-indicator-iec.js`.  
-  • Plan for a JS listener on `paletteChanged` to update `data-obc-theme`.  
-  • Ensure body background uses CSS var `--container-background-color`.
-</openbridge>
-
-<steps>
-  • Each PlanStep must supply:
-    1. `step_number` (integer, ascending)
-    2. `description` (human‑readable summary)
-    3. `file_outputs` (array of relative file paths)
-    4. `commands` (array of npm/Vite commands)
-    5. optional `rollback_commands` or `working_dir`
-  • One logical concern per step—no mixing.
-</steps>
-
-<note>
-  A valid AppPlan JSON object matching the injected schema will be produced automatically; focus only on *what* goes into each field, not *how* to format it.
-</note>
-"""
-
+Output **only** the AppPlan JSON (matching the AppPlan Pydantic model) — do not emit any code, shell commands, or explanations outside of the plan’s `steps`, `dependencies`, etc.
+        """
 
         # Add planning instructions to the messages with improved guidance
         planning_messages = [
@@ -205,24 +241,52 @@ A Pydantic AppPlan schema (with Framework, PlanStep and AppPlan definitions) wil
         llm = load_model(model_name=state.model_name, 
                          tools=tools,
                          test=state.test_mode,
-        )
+        )#parser=config["configurable"]["parser"])
+        system_prompt_1 = """
+You are the creator agent. Your job is to translate the AppPlan into a structured BoltArtifact, using one BoltAction per step.
+
+Strict Rules:
+- One-to-One Mapping: Each PlanStep → exactly one BoltAction. Never merge or skip steps.
+- Action Types:
+  - ShellAction for npm/Vite commands (e.g., `npm install`, `npm run dev`, `npx tailwindcss init -p`).
+  - FileAction for every path listed in PlanStep.file_outputs:
+      • filePath="{{project_dir}}/relative/path/to/file"
+      • content = the full, minimal, valid file contents (e.g., package.json skeleton, Tailwind config, React entry/App component).
+  - MessageAction only for final user‑facing summaries.
+- **No shell commands** like `touch`, `echo`, `sed`, or `cat` for file creation or edits. All file work must be via FileAction.
+
+File Output Rules:
+- Every file listed in file_outputs **must** become a FileAction with actual code/text.
+- File contents must be minimal, functional, and free of comments or placeholders.
+
+Command Ordering:
+1. Initialization (e.g. `npm create vite@latest …`)
+2. Dependency installation (`npm install`, `npm install -D …`)
+3. File creation/configuration via FileAction
+4. Dev server start (`npm run dev`)
+
+Batching:
+- You may batch purely directory navigation or purely install flags (e.g., `cd dir && npm install`) only if they belong to the same atomic step.
+
+Output Format:
+- Wrap all actions in a single `<boltArtifact id="..." title="...">`
+- Emit actions in the exact sequence of the AppPlan steps.
+
+Final notes:
+- Avoid placeholders or partial steps.
+- Generated actions will run in a browser‑based WebContainer; shell commands must be compatible.
+
+        """
         from .prompt import get_prompt, get_new_prompt
-        from .prompt import get_test_prompt
-        test_prompt = get_test_prompt(
-            cwd=state.cwd,
-            tools=tools,
-        )
-        
-        
         inputs = [
-            SystemMessage(content=get_new_prompt())
+            SystemMessage(content=get_prompt())
             ] + state.messages
 
         response = await llm.ainvoke(input=inputs)
         print(f"Response: {response}")
         # Return updated state with the response
         return {
-            "messages": [response],
+            "bolt_artifact": response,
             }
 
     @RunnableLambda

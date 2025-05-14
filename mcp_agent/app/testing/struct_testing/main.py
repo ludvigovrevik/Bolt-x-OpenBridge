@@ -33,10 +33,14 @@ from langchain_mcp_tools import convert_mcp_to_langchain_tools
 from langgraph.checkpoint.memory import MemorySaver
 import json
 from langchain_core.prompts import ChatPromptTemplate
+from .prompts.artifact_prompt import get_prompt
 from .load_model import load_model
 #from .graph import create_agent_graph, AgentState
-
-from .graph import create_agent_graph, AgentState
+from .graph_demo import (
+    AgentState as ReasoningAgentState,
+    create_agent_graph as create_reasoning_agent_graph,
+    )
+from .graph import create_agent_graph, AgentState, BoltArtifact
 from .prompt import openbridge_example
 #from .prompt import get_prompt
 import logging # Add logging import
@@ -70,25 +74,12 @@ class MCPAgent:
                 ],
                 "cwd": os.path.expanduser(self.repo_root)  # Explicit working directory
             },
-            "mcp-figma": {
-                "command": "npx",
-                "args": [
-                    "-y",
-                    "mcp-figma"
-                ]
-            },
-#             "sequential-thinking": {
-#                 "command": "npx",
-#                 "args": [
-#                     "-y",
-#                     "@modelcontextprotocol/server-sequential-thinking"
-#                 ]
-#             },
             }
         self.tools = None
         self.cleanup_func = None
         self.config = {"configurable": {
             "thread_id": uuid.uuid4(),
+            "parser": BoltArtifact,
         }}
         self.output_parser = None   # Placeholder for output parser
         self.human_in_the_loop = False
@@ -96,6 +87,7 @@ class MCPAgent:
         self.graph = None
         self.checkpointer = MemorySaver()
         self.reasoning_agent = None
+        self.structured_output = False
         self.initialized = False
         self.action_extractor = None  # Will be initialized when needed
         self.test_mode = False
@@ -120,19 +112,19 @@ class MCPAgent:
         return False
 
     async def initialize(self):
-        #self.tools, self.cleanup_func = await convert_mcp_to_langchain_tools(self.mcp_servers)
+        self.tools, self.cleanup_func = await convert_mcp_to_langchain_tools(self.mcp_servers)
         
         if self.tools:
             print("MCP tools loaded successfully")
-        
-        self.initialized = True  # Set flag to True after successful initialization
-        
-        # Always use the standard agent graph
-        self.graph = create_agent_graph(
-            #self.tools,
-            checkpointer=self.checkpointer
-        )
-
+            self.initialized = True  # Set flag to True after successful initialization
+            
+            # Always use the standard agent graph
+            self.graph = create_agent_graph(
+                self.tools,
+                self.checkpointer
+            )
+        else:
+            raise Exception("No tools were loaded from MCP servers")
 
     def create_prompt(self, cwd: str) -> ChatPromptTemplate:
         return [SystemMessage(content=get_prompt(cwd, self.tools))]
@@ -201,6 +193,80 @@ class MCPAgent:
             # The frontend will handle the XML parsing
             if content:
                 yield content
+
+    async def stream_artifacts(self, input: List[BaseMessage], config: Optional[dict] = None):
+        """Stream and extract artifacts from agent outputs."""
+        import uuid
+        
+        extractor = self.get_action_extractor()
+        config = config or self.config
+        artifact_started = False
+        buffered_actions = []  # Buffer to hold actions until we have artifact info
+        
+        async for content in self.astream_events(input=input, config=config):
+            # Process the chunk content with the extractor
+            new_actions = extractor.feed(content)
+            
+            # If we have actions but no artifact info yet, buffer them
+            if new_actions and not extractor.artifact_info and not artifact_started:
+                buffered_actions.extend(new_actions)
+                continue
+                
+            # If we have artifact info and haven't started the artifact, emit the opening tag
+            if extractor.artifact_info and not artifact_started:
+                aid = extractor.artifact_info["id"]
+                title = extractor.artifact_info["title"]
+                print(f"Artifact ID: {aid}, Title: {title}")
+                artifact_started = True
+                yield f'<boltArtifact id="{aid}" title="{title}">'
+                
+                # Emit any buffered actions
+                for action in buffered_actions:
+                    if action["type"] == "shell":
+                        yield f'<boltAction type="shell">{action["command"]}</boltAction>'
+                    elif action["type"] == "file":
+                        path = action["file_path"]
+                        content = action["content"]
+                        yield f'<boltAction type="file" filePath="{path}">{content}</boltAction>'
+                    elif action["type"] == "message":
+                        yield f'{action["content"]}'
+                buffered_actions = []  # Clear the buffer
+            
+            # Emit any new actions if we've started the artifact
+            if artifact_started:
+                for action in new_actions:
+                    if action["type"] == "shell":
+                        yield f'<boltAction type="shell">{action["command"]}</boltAction>'
+                    elif action["type"] == "file":
+                        path = action["file_path"]
+                        content = action["content"]
+                        yield f'<boltAction type="file" filePath="{path}">{content}</boltAction>'
+                    elif action["type"] == "message":
+                        yield f'{action["content"]}'
+        
+        # If we have buffered actions but never got artifact info, create a default artifact
+        if buffered_actions and not artifact_started:
+            default_id = f"generated-artifact-{uuid.uuid4()}"
+            default_title = "Generated Output"
+            print(f"Using default artifact - ID: {default_id}, Title: {default_title}")
+            yield f'<boltArtifact id="{default_id}" title="{default_title}">'
+            
+            # Emit the buffered actions
+            for action in buffered_actions:
+                if action["type"] == "shell":
+                    yield f'<boltAction type="shell">{action["command"]}</boltAction>'
+                elif action["type"] == "file":
+                    path = action["file_path"]
+                    content = action["content"]
+                    yield f'<boltAction type="file" filePath="{path}">{content}</boltAction>'
+                elif action["type"] == "message":
+                    yield f'{action["content"]}'
+            
+            artifact_started = True
+        
+        # Close the artifact tag if we opened one
+        if artifact_started:
+            yield '</boltArtifact>'
 
     async def cleanup(self):
         """Clean up MCP servers and other resources."""
@@ -296,12 +362,20 @@ async def chat_endpoint(request: ChatRequest):
 
         async def event_stream():
             """Stream formatted content directly from the agent's artifact stream."""
-            async for content in app.state.agent.stream_xml_content(
-                input=langchain_messages,
-            ):
-                
-                # Direct yield without additional processing
-                yield content
+            if app.state.agent.structured_output:
+                async for content in app.state.agent.stream_artifacts(
+                    input=langchain_messages,
+                ):
+                    
+                    # Direct yield without additional processing
+                    yield content
+            else:
+                async for content in app.state.agent.stream_xml_content(
+                    input=langchain_messages,
+                ):
+                    
+                    # Direct yield without additional processing
+                    yield content
                     
         print("Finished graph execution!")
         return StreamingResponse(event_stream(), media_type="text/event-stream")
