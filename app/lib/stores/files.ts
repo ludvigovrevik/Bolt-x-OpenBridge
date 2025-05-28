@@ -195,66 +195,6 @@ export class FilesStore {
       return '';
     }
   }
-  async sendFilesToBackend() {
-    const logger = createScopedLogger('sendFilesToBackend');
-    try {
-      const webcontainer = await this.#webcontainer;
-      const fileMap = this.files.get();
-      const files: Array<{
-        path: string;
-        content: string;
-        is_binary: boolean;
-      }> = [];
-
-      for (const [absolutePath, dirent] of Object.entries(fileMap)) {
-        if (dirent?.type === 'file') {
-          const relativePath = nodePath.relative(webcontainer.workdir, absolutePath);
-          
-          // Skip files outside working directory
-          if (relativePath.startsWith('..') || nodePath.isAbsolute(relativePath)) {
-            logger.warn(`Skipping file outside workdir: ${absolutePath}`);
-            continue;
-          }
-
-          const isBinary = dirent.isBinary;
-          let content = '';
-
-          if (isBinary) {
-            const buffer = await webcontainer.fs.readFile(relativePath);
-            content = this.#arrayBufferToBase64(buffer);
-          } else {
-            content = dirent.content;
-          }
-
-          files.push({
-            path: relativePath,
-            content,
-            is_binary: isBinary
-          });
-        }
-      }
-
-      const response = await fetch('http://your-fastapi-endpoint/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ files }),
-      });
-
-      if (!response.ok) {
-        const errorBody = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorBody}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      logger.error('Failed to send files:', error);
-      throw error;
-    }
-  }
-
-  #arrayBufferToBase64(buffer: Uint8Array) {
-    return Buffer.from(buffer).toString('base64');
-  }
 }
 
 function isBinaryFile(buffer: Uint8Array | undefined) {

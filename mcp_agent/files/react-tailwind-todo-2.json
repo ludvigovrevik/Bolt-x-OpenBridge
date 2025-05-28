@@ -1,0 +1,96 @@
+{
+  "metadata": {
+    "artifact_id": "react-tailwind-todo",
+    "message_id": "HZDaJ6G",
+    "chat_id": "343",
+    "url_id": "react-tailwind-todo-2",
+    "application_name": "React Todo App with Tailwind CSS",
+    "thread_id": "ba602060-ac44-4c89-b67a-568ea30f4dd3",
+    "created_at": "2025-05-28T18:35:45.405570",
+    "file_count": 8,
+    "project_info": {
+      "name": "react-tailwind-todo",
+      "version": "1.0.0",
+      "description": null,
+      "dependencies": {
+        "react": "^18.2.0",
+        "react-dom": "^18.2.0"
+      },
+      "scripts": {
+        "dev": "vite",
+        "build": "vite build",
+        "preview": "vite preview"
+      }
+    }
+  },
+  "files": [
+    {
+      "path": "/home/project/package.json",
+      "content": "{\n  \"name\": \"react-tailwind-todo\",\n  \"version\": \"1.0.0\",\n  \"type\": \"module\",\n  \"dependencies\": {\n    \"react\": \"^18.2.0\",\n    \"react-dom\": \"^18.2.0\"\n  },\n  \"devDependencies\": {\n    \"@vitejs/plugin-react\": \"^4.0.0\",\n    \"vite\": \"^4.3.9\",\n    \"tailwindcss\": \"^3.3.2\",\n    \"postcss\": \"^8.4.21\",\n    \"autoprefixer\": \"^10.4.14\"\n  },\n  \"scripts\": {\n    \"dev\": \"vite\",\n    \"build\": \"vite build\",\n    \"preview\": \"vite preview\"\n  }\n}\n",
+      "is_binary": false,
+      "size": 424,
+      "type": "text"
+    },
+    {
+      "path": "/home/project/vite.config.js",
+      "content": "import { defineConfig } from 'vite'\nimport react from '@vitejs/plugin-react'\n\nexport default defineConfig({\n  plugins: [react()]\n})\n",
+      "is_binary": false,
+      "size": 132,
+      "type": "text"
+    },
+    {
+      "path": "/home/project/tailwind.config.js",
+      "content": "/** @type {import('tailwindcss').Config} */\nexport default {\n  content: [\n    \"./index.html\",\n    \"./src/**/*.{js,ts,jsx,tsx}\"\n  ],\n  theme: {\n    extend: {}\n  },\n  plugins: []\n}\n",
+      "is_binary": false,
+      "size": 179,
+      "type": "text"
+    },
+    {
+      "path": "/home/project/postcss.config.js",
+      "content": "export default {\n  plugins: {\n    tailwindcss: {},\n    autoprefixer: {}\n  }\n}\n",
+      "is_binary": false,
+      "size": 78,
+      "type": "text"
+    },
+    {
+      "path": "/home/project/index.html",
+      "content": "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"/vite.svg\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <title>React Todo App</title>\n  </head>\n  <body>\n    <div id=\"root\"></div>\n    <script type=\"module\" src=\"/src/main.jsx\"></script>\n  </body>\n</html>\n",
+      "is_binary": false,
+      "size": 363,
+      "type": "text"
+    },
+    {
+      "path": "/home/project/src/main.jsx",
+      "content": "import React from 'react'\nimport ReactDOM from 'react-dom/client'\nimport App from './App.jsx'\nimport './index.css'\n\nReactDOM.createRoot(document.getElementById('root')).render(\n  <React.StrictMode>\n    <App />\n  </React.StrictMode>\n)\n",
+      "is_binary": false,
+      "size": 234,
+      "type": "text"
+    },
+    {
+      "path": "/home/project/src/index.css",
+      "content": "@tailwind base;\n@tailwind components;\n@tailwind utilities;\n",
+      "is_binary": false,
+      "size": 59,
+      "type": "text"
+    },
+    {
+      "path": "/home/project/src/App.jsx",
+      "content": "import React, { useState } from 'react';\n\nfunction App() {\n  const [tasks, setTasks] = useState([]);\n  const [newTask, setNewTask] = useState('');\n\n  const handleAddTask = () => {\n    if (newTask.trim() === '') return;\n    setTasks([...tasks, { id: Date.now(), text: newTask, completed: false }]);\n    setNewTask('');\n  };\n\n  const handleToggleComplete = (id) => {\n    setTasks(\n      tasks.map(task =>\n        task.id === id ? { ...task, completed: !task.completed } : task\n      )\n    );\n  };\n\n  const handleDeleteTask = (id) => {\n    setTasks(tasks.filter(task => task.id !== id));\n  };\n\n  return (\n    <div className=\"min-h-screen bg-gray-100 flex items-center justify-center p-4\">\n      <div className=\"w-full max-w-md bg-white rounded-lg shadow p-6\">\n        <h1 className=\"text-2xl font-bold mb-4 text-center\">Todo List</h1>\n        <div className=\"flex mb-4\">\n          <input\n            type=\"text\"\n            className=\"flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400\"\n            placeholder=\"Add a new task\"\n            value={newTask}\n            onChange={(e) => setNewTask(e.target.value)}\n            onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}\n          />\n          <button\n            className=\"ml-2 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600\"\n            onClick={handleAddTask}\n          >\n            Add\n          </button>\n        </div>\n        <ul className=\"space-y-2\">\n          {tasks.map((task) => (\n            <li\n              key={task.id}\n              className={`flex items-center justify-between p-2 border border-gray-200 rounded ${\n                task.completed ? 'bg-green-100 line-through text-gray-500' : ''\n              }`}\n            >\n              <div className=\"flex items-center\">\n                <input\n                  type=\"checkbox\"\n                  checked={task.completed}\n                  onChange={() => handleToggleComplete(task.id)}\n                  className=\"mr-2\"\n                />\n                <span>{task.text}</span>\n              </div>\n              <button\n                className=\"ml-4 text-red-500 hover:text-red-700\"\n                onClick={() => handleDeleteTask(task.id)}\n              >\n                Delete\n              </button>\n            </li>\n          ))}\n        </ul>\n      </div>\n    </div>\n  );\n}\n\nexport default App;\n",
+      "is_binary": false,
+      "size": 2404,
+      "type": "text"
+    }
+  ],
+  "messages": [
+    {
+      "role": "user",
+      "content": "Build a todo app in React using Tailwind",
+      "data": null
+    },
+    {
+      "role": "assistant",
+      "content": "<boltArtifact id=\"react-tailwind-todo\" title=\"React Todo App with Tailwind CSS\">\n  <boltAction type=\"file\" filePath=\"package.json\">\n{\n  \"name\": \"react-tailwind-todo\",\n  \"version\": \"1.0.0\",\n  \"type\": \"module\",\n  \"dependencies\": {\n    \"react\": \"^18.2.0\",\n    \"react-dom\": \"^18.2.0\"\n  },\n  \"devDependencies\": {\n    \"@vitejs/plugin-react\": \"^4.0.0\",\n    \"vite\": \"^4.3.9\",\n    \"tailwindcss\": \"^3.3.2\",\n    \"postcss\": \"^8.4.21\",\n    \"autoprefixer\": \"^10.4.14\"\n  },\n  \"scripts\": {\n    \"dev\": \"vite\",\n    \"build\": \"vite build\",\n    \"preview\": \"vite preview\"\n  }\n}\n  </boltAction>\n  <boltAction type=\"file\" filePath=\"vite.config.js\">\nimport { defineConfig } from 'vite'\nimport react from '@vitejs/plugin-react'\n\nexport default defineConfig({\n  plugins: [react()]\n})\n  </boltAction>\n  <boltAction type=\"file\" filePath=\"tailwind.config.js\">\n/** @type {import('tailwindcss').Config} */\nexport default {\n  content: [\n    \"./index.html\",\n    \"./src/**/*.{js,ts,jsx,tsx}\"\n  ],\n  theme: {\n    extend: {}\n  },\n  plugins: []\n}\n  </boltAction>\n  <boltAction type=\"file\" filePath=\"postcss.config.js\">\nexport default {\n  plugins: {\n    tailwindcss: {},\n    autoprefixer: {}\n  }\n}\n  </boltAction>\n  <boltAction type=\"file\" filePath=\"index.html\">\n<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"/vite.svg\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <title>React Todo App</title>\n  </head>\n  <body>\n    <div id=\"root\"></div>\n    <script type=\"module\" src=\"/src/main.jsx\"></script>\n  </body>\n</html>\n  </boltAction>\n  <boltAction type=\"file\" filePath=\"src/main.jsx\">\nimport React from 'react'\nimport ReactDOM from 'react-dom/client'\nimport App from './App.jsx'\nimport './index.css'\n\nReactDOM.createRoot(document.getElementById('root')).render(\n  <React.StrictMode>\n    <App />\n  </React.StrictMode>\n)\n  </boltAction>\n  <boltAction type=\"file\" filePath=\"src/index.css\">\n@tailwind base;\n@tailwind components;\n@tailwind utilities;\n  </boltAction>\n  <boltAction type=\"file\" filePath=\"src/App.jsx\">\nimport React, { useState } from 'react';\n\nfunction App() {\n  const [tasks, setTasks] = useState([]);\n  const [newTask, setNewTask] = useState('');\n\n  const handleAddTask = () => {\n    if (newTask.trim() === '') return;\n    setTasks([...tasks, { id: Date.now(), text: newTask, completed: false }]);\n    setNewTask('');\n  };\n\n  const handleToggleComplete = (id) => {\n    setTasks(\n      tasks.map(task =>\n        task.id === id ? { ...task, completed: !task.completed } : task\n      )\n    );\n  };\n\n  const handleDeleteTask = (id) => {\n    setTasks(tasks.filter(task => task.id !== id));\n  };\n\n  return (\n    <div className=\"min-h-screen bg-gray-100 flex items-center justify-center p-4\">\n      <div className=\"w-full max-w-md bg-white rounded-lg shadow p-6\">\n        <h1 className=\"text-2xl font-bold mb-4 text-center\">Todo List</h1>\n        <div className=\"flex mb-4\">\n          <input\n            type=\"text\"\n            className=\"flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400\"\n            placeholder=\"Add a new task\"\n            value={newTask}\n            onChange={(e) => setNewTask(e.target.value)}\n            onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}\n          />\n          <button\n            className=\"ml-2 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600\"\n            onClick={handleAddTask}\n          >\n            Add\n          </button>\n        </div>\n        <ul className=\"space-y-2\">\n          {tasks.map((task) => (\n            <li\n              key={task.id}\n              className={`flex items-center justify-between p-2 border border-gray-200 rounded ${\n                task.completed ? 'bg-green-100 line-through text-gray-500' : ''\n              }`}\n            >\n              <div className=\"flex items-center\">\n                <input\n                  type=\"checkbox\"\n                  checked={task.completed}\n                  onChange={() => handleToggleComplete(task.id)}\n                  className=\"mr-2\"\n                />\n                <span>{task.text}</span>\n              </div>\n              <button\n                className=\"ml-4 text-red-500 hover:text-red-700\"\n                onClick={() => handleDeleteTask(task.id)}\n              >\n                Delete\n              </button>\n            </li>\n          ))}\n        </ul>\n      </div>\n    </div>\n  );\n}\n\nexport default App;\n  </boltAction>\n  <boltAction type=\"shell\">npm install</boltAction>\n  <boltAction type=\"shell\">npm run dev</boltAction>\n</boltArtifact>",
+      "data": null
+    }
+  ]
+}

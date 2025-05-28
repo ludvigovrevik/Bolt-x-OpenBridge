@@ -9,6 +9,9 @@ import { EditorStore } from './editor';
 import { FilesStore, type FileMap } from './files';
 import { PreviewsStore } from './previews';
 import { TerminalStore } from './terminal';
+import { db, chatId } from '~/lib/persistence/useChatHistory';
+import { getMessages } from '~/lib/persistence/db';
+import type { File } from './files';
 
 export interface ArtifactState {
   id: string;
@@ -62,9 +65,15 @@ export class WorkbenchStore {
     return this.#editorStore.selectedFile;
   }
 
-  get firstArtifact(): ArtifactState | undefined {
-    return this.#getArtifact(this.artifactIdList[0]);
+get firstArtifact(): ArtifactState | undefined {
+  if (this.artifactIdList.length === 0) {
+    return undefined;
   }
+  if (this.artifactIdList.length > 1) {
+    console.warn('Multiple artifacts found, returning the first one.');
+  }
+  return this.#getArtifact(this.artifactIdList[0]);
+}
 
   get filesCount(): number {
     return this.#filesStore.filesCount;
@@ -214,24 +223,31 @@ export class WorkbenchStore {
     // TODO: what do we wanna do and how do we wanna recover from this?
   }
 
-  addArtifact({ messageId, title, id }: ArtifactCallbackData) {
-    const artifact = this.#getArtifact(messageId);
+addArtifact({ messageId, title, id }: ArtifactCallbackData) {
+  const artifact = this.#getArtifact(messageId);
 
-    if (artifact) {
-      return;
-    }
+  if (artifact) {
+    return;
+  }
 
-    if (!this.artifactIdList.includes(messageId)) {
-      this.artifactIdList.push(messageId);
-    }
+  if (!this.artifactIdList.includes(messageId)) {
+    this.artifactIdList.push(messageId);
+  }
 
-    this.artifacts.setKey(messageId, {
-      id,
-      title,
-      closed: false,
-      runner: new ActionRunner(webcontainer),
+  this.artifacts.setKey(messageId, {
+    id,
+    title,
+    closed: false,
+    runner: new ActionRunner(webcontainer),
+  });
+
+  // Send files when first artifact is added
+  if (this.artifactIdList.length === 1) {
+    this.sendFilesToBackend(id, messageId).catch((error) => {
+      console.error('Failed to send files for new artifact:', error);
     });
   }
+}
 
   updateArtifact({ messageId }: ArtifactCallbackData, state: Partial<ArtifactUpdateState>) {
     const artifact = this.#getArtifact(messageId);
@@ -271,6 +287,107 @@ export class WorkbenchStore {
     const artifacts = this.artifacts.get();
     return artifacts[id];
   }
+async sendFilesToBackend(artifactId: string, messageId?: string) {
+  try {
+    // Save all files first
+    await this.saveAllFiles();
+    
+    // Wait for files to be available
+    let attempts = 0;
+    const maxAttempts = 10;
+    
+    while (this.#filesStore.filesCount === 0 && attempts < maxAttempts) {
+      console.log(`Waiting for files... attempt ${attempts + 1}/${maxAttempts}`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      attempts++;
+    }
+    
+    if (this.#filesStore.filesCount === 0) {
+      console.log('No files found after waiting, sending empty array');
+    }
+    
+    // Get ALL files from the files store
+    const fileMap = this.#filesStore.files.get();
+    
+    // Debug logging
+    console.log('Raw fileMap:', fileMap);
+    console.log('FileMap entries count:', Object.keys(fileMap).length);
+    console.log('Files store count:', this.#filesStore.filesCount);
+    
+    // List all entries
+    Object.entries(fileMap).forEach(([path, dirent]) => {
+      console.log(`Path: ${path}, Type: ${dirent?.type}, Content length: ${dirent?.type === 'file' ? dirent.content?.length : 'N/A'}`);
+    });
+    
+    // Convert FileMap to array format for backend
+    const filesArray: Array<{path: string; content: string; is_binary: boolean; size: number}> = [];
+
+    for (const [filePath, dirent] of Object.entries(fileMap)) {
+      if (dirent && dirent.type === 'file') {
+        filesArray.push({
+          path: filePath,
+          content: dirent.content,
+          is_binary: dirent.isBinary,
+          size: dirent.content.length,
+        });
+      }
+    }
+
+    console.log(`Final files array length: ${filesArray.length}`);
+    // Get chat history and URL ID
+    let chatHistory: any[] = [];
+    let urlId: string | undefined;
+    let chatIdValue: string | undefined;
+    
+    try {
+      const currentChatId = chatId.get();
+      chatIdValue = currentChatId;
+      
+      if (db && currentChatId) {
+        const storedChat = await getMessages(db, currentChatId);
+        if (storedChat && storedChat.messages) {
+          chatHistory = storedChat.messages;
+          urlId = storedChat.urlId; // This might be the URL identifier
+        }
+      }
+    } catch (error) {
+      console.error('Failed to get chat history:', error);
+    }
+
+    console.log(`Sending ${filesArray.length} files to backend`);
+
+    // Send to backend
+    const response = await fetch('/api/files', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        artifact_id: artifactId,
+        message_id: messageId,
+        chat_id: chatIdValue, // Internal chat ID
+        url_id: urlId, // URL identifier
+        application_name: this.firstArtifact?.title, // Use artifact title as app name
+        files: filesArray,
+        messages: chatHistory,
+        thread_id: crypto.randomUUID(),
+        file_count: filesArray.length,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to send files: ${response.status} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log('Files sent successfully:', result);
+    
+    return result;
+  } catch (error) {
+    console.error('Failed to send files to backend:', error);
+    throw error;
+  }
+}
+
 }
 
 export const workbenchStore = new WorkbenchStore();

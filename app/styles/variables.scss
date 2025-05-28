@@ -219,6 +219,13 @@
   --header-height: 54px;
   --chat-max-width: 37rem;
   --chat-min-width: 640px;
+
+  /* Add responsive variables */
+  @media (max-width: 1024px) {
+    --chat-min-width: 100%; /* Take full width on small screens */
+    --workbench-width: 100%; /* Take full width on small screens */
+  }
+
   --workbench-width: min(calc(100% - var(--chat-min-width)), 1536px);
   --workbench-inner-width: var(--workbench-width);
   --workbench-left: calc(100% - var(--workbench-width));

@@ -1,0 +1,134 @@
+{
+  "react-vite": {
+    "name": "React + Vite",
+    "description": "Modern React 18+ app with Vite bundler, TypeScript support, and Tailwind CSS. Fast development with hot reload.",
+    "use_cases": ["SPAs", "dashboards", "interactive apps", "prototypes", "data visualization"],
+    "tech_stack": ["React 18", "Vite 4", "TypeScript", "Tailwind CSS"],
+    "complexity": "simple",
+    "build_time": "fast",
+    "port": 5173,
+    "main_file": "src/App.tsx",
+    "keywords": ["react", "spa", "dashboard", "interactive", "frontend", "ui", "component"],
+    "dependencies": {
+      "react": "^18.2.0",
+      "react-dom": "^18.2.0"
+    },
+    "dev_dependencies": {
+      "@vitejs/plugin-react": "^4.0.0",
+      "vite": "^4.3.9",
+      "tailwindcss": "^3.3.2",
+      "postcss": "^8.4.21",
+      "autoprefixer": "^10.4.14",
+      "typescript": "^5.0.2",
+      "@types/react": "^18.0.37",
+      "@types/react-dom": "^18.0.11"
+    },
+    "scripts": {
+      "dev": "vite",
+      "build": "vite build",
+      "preview": "vite preview"
+    },
+    "config_files": {
+      "vite.config.ts": "import { defineConfig } from 'vite'\nimport react from '@vitejs/plugin-react'\n\nexport default defineConfig({\n  plugins: [react()]\n})",
+      "tailwind.config.js": "/** @type {import('tailwindcss').Config} */\nexport default {\n  content: [\"./index.html\", \"./src/**/*.{js,ts,jsx,tsx}\"],\n  theme: { extend: {} },\n  plugins: []\n}",
+      "postcss.config.js": "export default {\n  plugins: { tailwindcss: {}, autoprefixer: {} }\n}",
+      "tsconfig.json": "{\n  \"compilerOptions\": {\n    \"target\": \"ES2020\",\n    \"useDefineForClassFields\": true,\n    \"lib\": [\"ES2020\", \"DOM\", \"DOM.Iterable\"],\n    \"module\": \"ESNext\",\n    \"skipLibCheck\": true,\n    \"moduleResolution\": \"bundler\",\n    \"allowImportingTsExtensions\": true,\n    \"resolveJsonModule\": true,\n    \"isolatedModules\": true,\n    \"noEmit\": true,\n    \"jsx\": \"react-jsx\",\n    \"strict\": true,\n    \"noUnusedLocals\": true,\n    \"noUnusedParameters\": true,\n    \"noFallthroughCasesInSwitch\": true\n  },\n  \"include\": [\"src\"],\n  \"references\": [{ \"path\": \"./tsconfig.node.json\" }]\n}"
+    }
+  },
+  "nextjs": {
+    "name": "Next.js",
+    "description": "Full-stack React framework with SSR/SSG, API routes, and TypeScript. Perfect for production websites and applications.",
+    "use_cases": ["websites", "e-commerce", "blogs", "full-stack apps", "SEO-critical apps", "landing pages"],
+    "tech_stack": ["Next.js 14", "React 18", "TypeScript", "Tailwind CSS"],
+    "complexity": "moderate",
+    "build_time": "medium",
+    "port": 3000,
+    "main_file": "pages/index.tsx",
+    "keywords": ["nextjs", "website", "blog", "ecommerce", "seo", "ssr", "fullstack", "production"],
+    "dependencies": {
+      "next": "^14.2.5",
+      "react": "^18",
+      "react-dom": "^18"
+    },
+    "dev_dependencies": {
+      "typescript": "^5",
+      "@types/node": "^20",
+      "@types/react": "^18",
+      "@types/react-dom": "^18",
+      "tailwindcss": "^3.3.2",
+      "postcss": "^8.4.21",
+      "autoprefixer": "^10.4.14"
+    },
+    "scripts": {
+      "dev": "next dev",
+      "build": "next build",
+      "start": "next start"
+    },
+    "config_files": {
+      "next.config.js": "/** @type {import('next').NextConfig} */\nconst nextConfig = {\n  reactStrictMode: true\n}\n\nmodule.exports = nextConfig",
+      "tailwind.config.js": "/** @type {import('tailwindcss').Config} */\nmodule.exports = {\n  content: [\"./pages/**/*.{js,ts,jsx,tsx}\", \"./components/**/*.{js,ts,jsx,tsx}\"],\n  theme: { extend: {} },\n  plugins: []\n}",
+      "tsconfig.json": "{\n  \"compilerOptions\": {\n    \"target\": \"es5\",\n    \"lib\": [\"dom\", \"dom.iterable\", \"es6\"],\n    \"allowJs\": true,\n    \"skipLibCheck\": true,\n    \"strict\": true,\n    \"noEmit\": true,\n    \"esModuleInterop\": true,\n    \"module\": \"esnext\",\n    \"moduleResolution\": \"node\",\n    \"resolveJsonModule\": true,\n    \"isolatedModules\": true,\n    \"jsx\": \"preserve\",\n    \"incremental\": true,\n    \"baseUrl\": \".\",\n    \"paths\": { \"@/*\": [\"./*\"] }\n  },\n  \"include\": [\"next-env.d.ts\", \"**/*.ts\", \"**/*.tsx\"],\n  \"exclude\": [\"node_modules\"]\n}"
+    }
+  },
+  "vue": {
+    "name": "Vue.js",
+    "description": "Progressive Vue.js 3 framework with Composition API, Vite, and TypeScript support. Great for component-driven development.",
+    "use_cases": ["SPAs", "progressive web apps", "component libraries", "interactive UIs", "admin panels"],
+    "tech_stack": ["Vue 3", "Vite 4", "TypeScript", "Tailwind CSS"],
+    "complexity": "simple",
+    "build_time": "fast",
+    "port": 5173,
+    "main_file": "src/App.vue",
+    "keywords": ["vue", "spa", "component", "progressive", "admin", "panel", "interactive"],
+    "dependencies": {
+      "vue": "^3.3.0"
+    },
+    "dev_dependencies": {
+      "@vitejs/plugin-vue": "^4.2.3",
+      "vite": "^4.3.9",
+      "typescript": "^5.0.2",
+      "vue-tsc": "^1.4.2",
+      "tailwindcss": "^3.3.2",
+      "postcss": "^8.4.21",
+      "autoprefixer": "^10.4.14"
+    },
+    "scripts": {
+      "dev": "vite",
+      "build": "vue-tsc && vite build",
+      "preview": "vite preview"
+    },
+    "config_files": {
+      "vite.config.ts": "import { defineConfig } from 'vite'\nimport vue from '@vitejs/plugin-vue'\n\nexport default defineConfig({\n  plugins: [vue()]\n})",
+      "tailwind.config.js": "/** @type {import('tailwindcss').Config} */\nexport default {\n  content: [\"./index.html\", \"./src/**/*.{vue,js,ts,jsx,tsx}\"],\n  theme: { extend: {} },\n  plugins: []\n}",
+      "postcss.config.js": "export default {\n  plugins: { tailwindcss: {}, autoprefixer: {} }\n}"
+    }
+  },
+  "vanilla-js": {
+    "name": "Vanilla JavaScript",
+    "description": "Pure JavaScript with Vite bundler and modern tooling. Lightweight and fast for simple projects.",
+    "use_cases": ["simple websites", "landing pages", "widgets", "demos", "learning projects"],
+    "tech_stack": ["Vanilla JS", "Vite 4", "Tailwind CSS"],
+    "complexity": "simple",
+    "build_time": "fastest",
+    "port": 5173,
+    "main_file": "src/main.js",
+    "keywords": ["vanilla", "javascript", "simple", "lightweight", "demo", "learning", "widget"],
+    "dependencies": {},
+    "dev_dependencies": {
+      "vite": "^4.3.9",
+      "tailwindcss": "^3.3.2",
+      "postcss": "^8.4.21",
+      "autoprefixer": "^10.4.14"
+    },
+    "scripts": {
+      "dev": "vite",
+      "build": "vite build",
+      "preview": "vite preview"
+    },
+    "config_files": {
+      "vite.config.js": "import { defineConfig } from 'vite'\n\nexport default defineConfig({})",
+      "tailwind.config.js": "/** @type {import('tailwindcss').Config} */\nexport default {\n  content: [\"./index.html\", \"./src/**/*.{js,html}\"],\n  theme: { extend: {} },\n  plugins: []\n}",
+      "postcss.config.js": "export default {\n  plugins: { tailwindcss: {}, autoprefixer: {} }\n}"
+    }
+  }
+}

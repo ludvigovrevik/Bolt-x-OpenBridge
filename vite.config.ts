@@ -16,6 +16,17 @@ export default defineConfig((config) => {
         sass: { api: 'modern-compiler' }
       }
     },
+    server: {
+      proxy: {
+        '/api': {
+          target: 'http://localhost:8000',
+          changeOrigin: true,
+          // If your backend doesn't use the /api prefix at the start of its routes
+          // uncomment the line below:
+          // rewrite: (path) => path.replace(/^\/api/, '')
+        }
+      }
+    },
     plugins: [
       nodePolyfills({
         include: ['path', 'buffer'],

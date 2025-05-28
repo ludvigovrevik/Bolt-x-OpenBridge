@@ -1,5 +1,5 @@
 import type { Message } from 'ai';
-import React, { type RefCallback, type ChangeEvent, type RefObject } from 'react'; // Removed useState, useRef; Added ChangeEvent, RefObject
+import React, { type RefCallback, type ChangeEvent, type RefObject, useEffect, useState } from 'react'; // Removed useState, useRef; Added ChangeEvent, RefObject
 import { ClientOnly } from 'remix-utils/client-only';
 import { Menu } from '~/components/sidebar/Menu.client';
 import { IconButton } from '~/components/ui/IconButton';
@@ -72,14 +72,30 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
     const TEXTAREA_MAX_HEIGHT = chatStarted ? 400 : 200;
     // Removed internal state and handlers - now using props
 
+    // Add responsive state
+    const [isSmallScreen, setIsSmallScreen] = useState(false);
+
+    // Detect screen size changes
+    useEffect(() => {
+      const checkScreenSize = () => {
+        setIsSmallScreen(window.innerWidth < 1024); // Adjust breakpoint as needed
+      };
+
+      checkScreenSize();
+      window.addEventListener('resize', checkScreenSize);
+      return () => window.removeEventListener('resize', checkScreenSize);
+    }, []);
+
     return (
       <div
         ref={ref}
         className={classNames(
           styles.BaseChat,
           'relative flex h-full w-full overflow-hidden bg-bolt-elements-background-depth-1',
+          { 'small-screen': isSmallScreen },
         )}
         data-chat-visible={showChat}
+        data-small-screen={isSmallScreen}
       >
         <ClientOnly>{() => <Menu />}</ClientOnly>
         <div ref={scrollRef} className="flex overflow-y-auto w-full h-full">

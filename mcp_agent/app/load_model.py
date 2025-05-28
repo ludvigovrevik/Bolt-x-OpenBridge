@@ -57,7 +57,7 @@ def load_model(model_name,
             model = model.bind_tools(tools)
 
         if parser:
-            model = model.with_structured_output(schema=parser)
+            model = model.with_structured_output(schema=parser, method="function_calling")
             
             if prompt:
                 chain = model | prompt

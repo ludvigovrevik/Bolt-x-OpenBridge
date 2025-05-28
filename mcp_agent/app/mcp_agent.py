@@ -79,10 +79,10 @@ class MCPAgent:
 #                 ]
 #             },
             }
-        self.tools = None
+        self.tools = []  # Initialize tools as an empty list
         self.cleanup_func = None
         self.config = {"configurable": {
-            "thread_id": uuid.uuid4(),
+            "thread_id": uuid.UUID,
         }}
         self.output_parser = None   # Placeholder for output parser
         self.human_in_the_loop = False
@@ -103,8 +103,11 @@ class MCPAgent:
         return self.reasoning_agent
 
     async def initialize(self):
-        self.tools, self.cleanup_func = await convert_mcp_to_langchain_tools(self.mcp_servers)
-        
+        mcp_tools, self.cleanup_func = await convert_mcp_to_langchain_tools(self.mcp_servers)
+
+
+        self.tools.extend(mcp_tools)  # Extend the existing tools list with new tools
+
         if self.tools:
             print("MCP tools loaded successfully")
         
