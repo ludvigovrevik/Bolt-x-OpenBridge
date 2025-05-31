@@ -1,0 +1,33 @@
+{
+  "artifact_id": "react-tailwind-todo-2",
+  "created_at": "2025-05-30T17:10:51.053856",
+  "file_count": 8,
+  "vector_count": 12,
+  "file_hashes": {
+    "/home/project/package.json": -4295478336901011049,
+    "/home/project/vite.config.js": -1512807326918497184,
+    "/home/project/tailwind.config.js": -7703794787431803936,
+    "/home/project/postcss.config.js": -8413200397285734283,
+    "/home/project/index.html": -5459402172961034199,
+    "/home/project/src/main.jsx": -5845426438627694156,
+    "/home/project/src/index.css": 7866832227893291420,
+    "/home/project/src/App.jsx": -3550013688934513767
+  },
+  "file_paths": [
+    "/home/project/package.json",
+    "/home/project/vite.config.js",
+    "/home/project/tailwind.config.js",
+    "/home/project/postcss.config.js",
+    "/home/project/index.html",
+    "/home/project/src/main.jsx",
+    "/home/project/src/index.css",
+    "/home/project/src/App.jsx"
+  ],
+  "file_extensions": [
+    "css",
+    "json",
+    "js",
+    "html",
+    "jsx"
+  ]
+}

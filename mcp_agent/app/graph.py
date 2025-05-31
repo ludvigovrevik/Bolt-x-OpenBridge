@@ -107,6 +107,7 @@ class AgentState(BaseModel):
     max_steps: int = 1
     agent_brain: Optional[Annotated[list[AgentBrain], operator.add]] = Field(default_factory=list)
     artifact_spec: Optional[ArtifactSpec] = None  # Specification for the artifact to create
+    artifact_files: Optional[List[ArtifactFile]] = None  # Files to create as part of the artifact
 
     class Config:
         arbitrary_types_allowed = True

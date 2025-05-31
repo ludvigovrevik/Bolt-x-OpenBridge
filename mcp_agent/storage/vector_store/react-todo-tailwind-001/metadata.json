@@ -1,0 +1,15 @@
+{
+  "artifact_id": "react-todo-tailwind-001",
+  "created_at": "2025-05-31T07:24:42.794641",
+  "file_count": 1,
+  "vector_count": 1,
+  "file_hashes": {
+    "/home/project/package.json": -3177028368369585692
+  },
+  "file_paths": [
+    "/home/project/package.json"
+  ],
+  "file_extensions": [
+    "json"
+  ]
+}

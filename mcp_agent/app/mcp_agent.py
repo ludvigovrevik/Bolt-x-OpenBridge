@@ -33,6 +33,7 @@ from .load_model import load_model
 #from .graph import create_agent_graph, AgentState
 
 from .graph import create_agent_graph, AgentState
+from .graph_simple import create_agent_graph as create_react_agent, MyAgentState
 import logging # Add logging import
 import uuid
 
@@ -84,43 +85,73 @@ class MCPAgent:
         self.config = {"configurable": {
             "thread_id": uuid.UUID,
         }}
+        # Initialize agent state as instance variable
+        self.agent_state = MyAgentState(
+            cwd=os.getcwd(),
+            model_name=self.llm.model_name,
+            messages=[],
+            test_mode=False,
+            use_planner=False,
+            artifact_id=None,
+            files=None,
+            ui_components=None
+        )
+        
         self.output_parser = None   # Placeholder for output parser
         self.human_in_the_loop = False
         self.prompt = None
         self.graph = None
-        self.reasoning_agent = None
         self.initialized = False
         self.action_extractor = None  # Will be initialized when needed
-        self.test_mode = False
     
-    async def set_agent_type(self, reasoning: bool = False):
-        """Set the agent type and reinitialize the graph if needed"""
-        # Store the requested reasoning mode but ALWAYS use standard agent
-        self.reasoning_agent = reasoning
+    def update_agent_state(self, **kwargs):
+        """Enhanced update method that handles all agent state changes"""
+        for key, value in kwargs.items():
+            if key in self.agent_state or hasattr(self.agent_state, key):
+                self.agent_state[key] = value
+                logger.info(f"Updated agent state: {key} = {value}")
+            else:
+                logger.warning(f"Unknown agent state key: {key}")
         
-        logger.info(f"Agent set to standard type (reasoning preference noted: {reasoning})")
+        # Handle reasoning mode update
+        if 'use_planner' in kwargs:
+            logger.info(f"Agent reasoning mode set to: {kwargs['use_planner']}")
         
-        return self.reasoning_agent
+        # Handle test mode update
+        if 'test_mode' in kwargs:
+            logger.info(f"Agent test mode set to: {kwargs['test_mode']}")
+
+    def get_agent_state(self) -> MyAgentState:
+        """Get the current agent state"""
+        return self.agent_state
+
+    def set_artifact(self, artifact_id: str, files: Optional[List[str]] = None):
+        """Convenience method to set artifact using update_agent_state"""
+        update_data = {"artifact_id": artifact_id}
+        if files:
+            update_data["files"] = files
+        
+        self.update_agent_state(**update_data)
+
+    def set_reasoning_mode(self, reasoning: bool):
+        """Convenience method to set reasoning mode using update_agent_state"""
+        self.update_agent_state(use_planner=reasoning)
+
+    def set_test_mode(self, test_mode: bool):
+        """Convenience method to set test mode using update_agent_state"""
+        self.update_agent_state(test_mode=test_mode)
 
     async def initialize(self):
         mcp_tools, self.cleanup_func = await convert_mcp_to_langchain_tools(self.mcp_servers)
-
-
-        self.tools.extend(mcp_tools)  # Extend the existing tools list with new tools
+        self.tools.extend(mcp_tools)
 
         if self.tools:
             print("MCP tools loaded successfully")
         
-        self.initialized = True  # Set flag to True after successful initialization
+        self.initialized = True
         
         # Always use the standard agent graph
-        self.graph = create_agent_graph(
-            tools=self.tools,
-        )
-
-    from .prompt import get_prompt
-    def create_prompt(self, cwd: str) -> ChatPromptTemplate:
-        return [SystemMessage(content=get_prompt(cwd, self.tools))]
+        self.graph = create_react_agent(tools=self.tools)
 
     def get_action_extractor(self):
         """Get or create a StreamingActionExtractor instance."""
@@ -130,50 +161,64 @@ class MCPAgent:
         return self.action_extractor
 
     async def astream_events(self, input: List[BaseMessage], config: dict):
-        initial_state = AgentState(
-            cwd=os.getcwd(),
-            model_name=self.llm.model_name,
-            messages=input,
-            use_planner=self.reasoning_agent,
-            test_mode=self.test_mode,
-        )
-        print(f"Using standard agent graph")
+        # Update the persistent agent state with new messages
+        self.agent_state["messages"] = input
         
+        files = self.agent_state.get('files') or []
+        logger.info(f"Using agent state: artifact_id={self.agent_state.get('artifact_id')}, files={len(files)}")
+        content = ""
         async for event in self.graph.astream_events(
-            initial_state,
+            self.agent_state,  # Use the persistent state
             config=self.config,
             stream_mode="values"
         ):
-            if initial_state.test_mode:
+            if self.agent_state.get("test_mode"):
                 if event["event"] == "on_chain_stream":
-                    # Handle the event from the chain
                     chunk = event["data"]["chunk"]
-                    
-                    # If chunk is a dictionary with bolt_artifact (your case)
                     if isinstance(chunk, dict) and "bolt_artifact" in chunk:
                         bolt_artifact = chunk["bolt_artifact"]
                         if isinstance(bolt_artifact, AIMessage):
-                            print(f"Raw chunk content: {bolt_artifact.content}")  # Debug log for raw content
+                            logger.debug(f"Raw chunk content: {bolt_artifact.content}")
                             yield bolt_artifact.content
                         
-            #response = ""
             if event["event"] == "on_chat_model_stream":
                 chunk = event["data"]["chunk"]
+                content += chunk.content
+                logger.info(f"Streaming chunk: {content}")  # Better logging
                 yield chunk.content
 
     async def stream_xml_content(self, input: List[BaseMessage], config: Optional[dict] = None):
-        """Stream XML-formatted content with boltArtifact and boltAction tags."""
+        """
+        Enhanced streaming with agent state management.
+        This is now the single point of truth for streaming responses.
+        """
         config = config or self.config
-        print(f"Using standard agent graph without structured output")
+        
+        # Update agent state with incoming messages
+        self.agent_state["messages"] = input
+        
+
+        files = self.agent_state.get('files') or []
+        logger.info(f"Streaming with artifact_id: {self.agent_state.get('artifact_id')}, files: {len(files)}")
+        logger.debug(f"Agent state summary: {self.get_state_summary()}")
         
         async for content in self.astream_events(input=input, config=config):
-            # Focus ONLY on the event carrying content chunks from the LLM stream
-            logger.debug(f"Raw chunk content: {content}")  # Debug log for raw content
-
-            # Just send the content without any processing
-            # The frontend will handle the XML parsing
+            logger.debug(f"Streaming content chunk: {content[:100]}...")
+            
+            # Direct yield - let the frontend handle XML parsing
             if content:
                 yield content
+
+    def get_state_summary(self) -> Dict[str, Any]:
+        """Get a summary of current agent state for debugging"""
+        return {
+            "artifact_id": self.agent_state.get("artifact_id"),
+            "files_count": len(self.agent_state.get("files") or []),
+            "has_messages": bool(self.agent_state.get("messages")),
+            "reasoning_mode": self.agent_state.get("use_planner", False),
+            "test_mode": self.agent_state.get("test_mode", False),
+            "cwd": self.agent_state.get("cwd")
+        }
 
     async def cleanup(self):
         """Clean up MCP servers and other resources."""
@@ -185,5 +230,4 @@ class MCPAgent:
                 print(f"Error during MCP tools cleanup: {e}")
         else:
             print("No cleanup function available")
-        # Reset initialized state
         self.initialized = False
