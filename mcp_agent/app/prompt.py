@@ -1,4 +1,4 @@
-def get_test_prompt(cwd: str, tools=None) -> str:
+def get_test_prompt(cwd: str = ".", tools=None) -> str:
     if tools is None:
         tools = [] # Handle case where no tools are provided
     # Generate list of tool descriptions
