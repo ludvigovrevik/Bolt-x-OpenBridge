@@ -32,7 +32,6 @@ def get_unified_creator_prompt(
         context_instructions = """
 **PROJECT TYPE: NEW PROJECT FROM SCRATCH**
 - Create a complete new application structure
-- Use the full tech stack (React + Vite + Tailwind)
 - Generate a new unique artifact ID
 - Include all required configuration files
 - No need to use retrieval tools unless specifically asked
@@ -59,10 +58,11 @@ Your task is to analyze the user request and implement the appropriate changes a
 
 **ENHANCED PROCESS:**
 1. **Analyze** the user request to understand requirements
-2. **Determine Context Needs** - Does this request need existing code context?
-3. **Gather Context** - Use retrieval tools if needed to understand existing files
-4. **Plan** the implementation approach based on project type
-5. **Implement** using only `<boltAction>` tags
+2. **Generate Summary** - Provide a brief overview of what you will implement
+3. **Determine Context Needs** - Does this request need existing code context?
+4. **Gather Context** - Use retrieval tools if needed to understand existing files
+5. **Plan** the implementation approach based on project type
+6. **Implement** using only `<boltAction>` tags
 
 {tool_instructions}
 
@@ -90,6 +90,45 @@ Follow these rules when creating artifacts:
 - Vite 4.3.9 + @vitejs/plugin-react 4.0.0
 - Tailwind CSS 3.3.2 + PostCSS + Autoprefixer
 - Standard package.json scripts: dev, build, preview
+
+**DARK MODE REQUIREMENTS:**
+When implementing dark mode functionality, ALWAYS include:
+1. **Tailwind Configuration**: Set `darkMode: 'class'` in tailwind.config.js
+2. **Theme Persistence**: Save preference to localStorage
+3. **System Preference Detection**: Check system dark mode preference on initial load
+4. **Proper State Management**: Use React hooks for theme state
+5. **Class Toggle**: Toggle 'dark' class on document.documentElement
+6. **Consistent Styling**: Ensure all components support both light and dark variants
+
+**DARK MODE IMPLEMENTATION PATTERN:**
+```javascript
+// Theme Hook (src/hooks/useTheme.js)
+import {{ useState, useEffect }} from 'react'
+
+export function useTheme() {{
+  const [isDark, setIsDark] = useState(() => {{
+    // Check localStorage first, then system preference
+    const saved = localStorage.getItem('theme')
+    if (saved) return saved === 'dark'
+    return window.matchMedia('(prefers-color-scheme: dark)').matches
+  }})
+
+  useEffect(() => {{
+    // Apply theme to document
+    if (isDark) {{
+      document.documentElement.classList.add('dark')
+      localStorage.setItem('theme', 'dark')
+    }} else {{
+      document.documentElement.classList.remove('dark')
+      localStorage.setItem('theme', 'light')
+    }}
+  }}, [isDark])
+
+  const toggleTheme = () => setIsDark(prev => !prev)
+
+  return {{ isDark, toggleTheme }}
+}}
+```
 
 **REQUIRED ARTIFACT FORMAT:**
 
@@ -134,6 +173,7 @@ Follow these rules when creating artifacts:
       "./index.html",
       "./src/**/*.{{js,ts,jsx,tsx}}"
     ],
+    darkMode: 'class',
     theme: {{
       extend: {{}}
     }},
@@ -190,8 +230,8 @@ Follow these rules when creating artifacts:
 
   function App() {{
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <h1 className="text-4xl font-bold text-blue-600">Hello World</h1>
+      <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex items-center justify-center">
+        <h1 className="text-4xl font-bold text-blue-600 dark:text-blue-400">Hello World</h1>
       </div>
     )
   }}
@@ -218,10 +258,11 @@ Follow these rules when creating artifacts:
 ```
 
 **INSTRUCTIONS:**
-1. **First**: Analyze if this request needs context from existing files
-2. **If context needed**: Use retrieval tools to understand existing code
-3. **Then**: Create the complete artifact following the EXACT format shown above
-4. **Remember**: Each file gets its own `<boltAction>` tag with `filePath` attribute
+1. **First**: Generate a clear summary of what you will implement
+2. **Second**: Analyze if this request needs context from existing files
+3. **If context needed**: Use retrieval tools to understand existing code
+4. **Then**: Create the complete artifact following the EXACT format shown above
+5. **Remember**: Each file gets its own `<boltAction>` tag with `filePath` attribute
 
-Implement the request using the exact XML format shown above.
+Start with a brief summary, then implement the request using the exact XML format shown above.
 """

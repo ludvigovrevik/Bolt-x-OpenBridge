@@ -183,8 +183,9 @@ class MCPAgent:
                         
             if event["event"] == "on_chat_model_stream":
                 chunk = event["data"]["chunk"]
+                if chunk.tool_calls:
+                    logger.print(f"Tool call detected: {chunk.tool_calls}")
                 content += chunk.content
-                logger.info(f"Streaming chunk: {content}")  # Better logging
                 yield chunk.content
 
     async def stream_xml_content(self, input: List[BaseMessage], config: Optional[dict] = None):

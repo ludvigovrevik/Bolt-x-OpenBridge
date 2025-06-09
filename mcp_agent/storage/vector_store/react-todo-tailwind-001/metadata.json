@@ -1,15 +1,37 @@
 {
   "artifact_id": "react-todo-tailwind-001",
-  "created_at": "2025-05-31T07:24:42.794641",
-  "file_count": 1,
-  "vector_count": 1,
+  "created_at": "2025-06-08T11:38:57.052577",
+  "file_count": 10,
+  "vector_count": 14,
   "file_hashes": {
-    "/home/project/package.json": -3177028368369585692
+    "/home/project/package.json": 4003439117852526035,
+    "/home/project/vite.config.js": 7364847568207367643,
+    "/home/project/tailwind.config.js": 9122096672359990350,
+    "/home/project/postcss.config.js": 7614142499500407230,
+    "/home/project/index.html": 3178036681080406733,
+    "/home/project/src/main.jsx": -1119463351673893639,
+    "/home/project/src/index.css": 4194220632156635228,
+    "/home/project/src/App.jsx": -7451294668876849972,
+    "/home/project/src/components/Header.jsx": 866662607388840150,
+    "/home/project/src/components/TodoList.jsx": 3980072150023280461
   },
   "file_paths": [
-    "/home/project/package.json"
+    "/home/project/package.json",
+    "/home/project/vite.config.js",
+    "/home/project/tailwind.config.js",
+    "/home/project/postcss.config.js",
+    "/home/project/index.html",
+    "/home/project/src/main.jsx",
+    "/home/project/src/index.css",
+    "/home/project/src/App.jsx",
+    "/home/project/src/components/Header.jsx",
+    "/home/project/src/components/TodoList.jsx"
   ],
   "file_extensions": [
-    "json"
+    "jsx",
+    "css",
+    "js",
+    "json",
+    "html"
   ]
 }

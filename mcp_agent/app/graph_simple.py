@@ -13,6 +13,7 @@ from .prompts.creator_prompt import get_unified_creator_prompt
 from langgraph.prebuilt.chat_agent_executor import AgentState
 from .utils.artifact_functions import get_artifact_files, artifact_exists
 import logging
+from .prompt import get_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +88,6 @@ def create_agent_graph(tools: Optional[List[Any]] = None) -> Any:
     return create_react_agent(
         model=model,
         tools=tools,
-        prompt=create_agent_prompt,
+        prompt=get_prompt(),
         state_schema=MyAgentState,
     )

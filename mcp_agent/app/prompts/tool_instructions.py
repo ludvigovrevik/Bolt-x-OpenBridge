@@ -155,4 +155,4 @@ file_content    file_contents  implementation
 - Tools return data that you use for implementation decisions
 - Always analyze retrieved content before implementation
 
-</tool_usage_instructions>"""
+</tool_usage_instructions>"""   
