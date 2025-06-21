@@ -1,0 +1,18 @@
+{
+  "artifact_id": "openbridge-website",
+  "created_at": "2025-06-21T12:45:06.344607",
+  "file_count": 2,
+  "vector_count": 3,
+  "file_hashes": {
+    "/home/project/package-lock.json": -6504953406765143999,
+    "/home/project/index.html": -2905721210876780986
+  },
+  "file_paths": [
+    "/home/project/package-lock.json",
+    "/home/project/index.html"
+  ],
+  "file_extensions": [
+    "html",
+    "json"
+  ]
+}

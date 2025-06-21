@@ -13,7 +13,7 @@ from .prompts.creator_prompt import get_unified_creator_prompt
 from langgraph.prebuilt.chat_agent_executor import AgentState
 from .utils.artifact_functions import get_artifact_files, artifact_exists
 import logging
-from .prompt import get_prompt
+from .prompt import get_test_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class MyAgentState(AgentState):
     files: Optional[List[str]] = None  # Changed to List[str] for file paths
     ui_components: Optional[List[Dict[str, Any]]] = None  # Fixed typo: ui_compponents -> ui_components
     artifact_id: Optional[str] = None
-    
+
     class Config:
         arbitrary_types_allowed = True
 
@@ -49,7 +49,7 @@ class MyAgentState(AgentState):
             except Exception as e:
                 logger.error(f"Failed to load files for artifact {self.get('artifact_id')}: {e}")
                 self["files"] = []
-        
+
         return self.get("files", [])
 
 
@@ -60,10 +60,10 @@ def create_agent_prompt(state: MyAgentState) -> List[BaseMessage]:
     user_request = state["messages"][-1] if state.get("messages") else HumanMessage(content="")
 
     files = state.get("files", [])
-    
+
     ui_components = state.get("ui_components", [])
     artifact_id = state.get("artifact_id")
-    
+
     system_msg = get_unified_creator_prompt(
         cwd=cwd,
         user_request=user_request.content,
@@ -71,7 +71,7 @@ def create_agent_prompt(state: MyAgentState) -> List[BaseMessage]:
         ui_components=ui_components,
         artifact_id=artifact_id
     )
-    
+
     # Return BaseMessage objects
     prompt = [SystemMessage(content=system_msg)] + state["messages"]
     logger.info(f"Invoking agent with prompt: {prompt}")
@@ -88,6 +88,6 @@ def create_agent_graph(tools: Optional[List[Any]] = None) -> Any:
     return create_react_agent(
         model=model,
         tools=tools,
-        prompt=get_prompt(),
+        prompt=get_test_prompt(),
         state_schema=MyAgentState,
     )
